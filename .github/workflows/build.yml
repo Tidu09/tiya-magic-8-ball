@@ -54,9 +54,13 @@ jobs:
       - name: Publish if FW_VERSION went up
         run: |
           VER=$(grep -oP '^#define FW_VERSION\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          SIZE=$(stat -c %s build/Magic8Ball.ino.bin)
+          # Compare with what is published NOW (an earlier run may have just
+          # published), and commit on top of the latest main.
+          git fetch -q origin main
+          git checkout -q -B publish origin/main
           PUB=0
           [ -f firmware/version.txt ] && PUB=$(cut -d' ' -f1 firmware/version.txt)
-          SIZE=$(stat -c %s build/Magic8Ball.ino.bin)
           echo "Source FW_VERSION=$VER, published=$PUB, binary=$SIZE bytes"
           if [ "$VER" -le "$PUB" ]; then
             echo "Not newer than the published version: compile check only."
@@ -70,5 +74,4 @@ jobs:
           git config user.email "firmware-bot@users.noreply.github.com"
           git add firmware/firmware.bin firmware/version.txt
           git commit -m "Publish firmware v$VER ($SIZE bytes)"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git push origin publish:main
