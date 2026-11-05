@@ -52,10 +52,22 @@ static void otaWifiOff() {
   WiFi.mode(WIFI_OFF);
 }
 
+// Re-apply the low TX power every time the radio (re)starts, in station
+// or hotspot mode: WiFiManager switches modes on its own.
+static void otaTxPowerEvent(WiFiEvent_t event) {
+  if (event == ARDUINO_EVENT_WIFI_STA_START || event == ARDUINO_EVENT_WIFI_AP_START) {
+    WiFi.setTxPower(OTA_TX_POWER);
+  }
+}
+
 // ---------------- Wi-Fi (saved network, else setup hotspot) ----------------
 static bool otaConnect() {
   otaScreen("Update", "connecting to Wi-Fi", NULL, C_YELLOW);
+  static bool eventHooked = false;
+  if (!eventHooked) { WiFi.onEvent(otaTxPowerEvent); eventHooked = true; }
   WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(OTA_TX_POWER);
+  if (DEBUG_USB) Serial.println("OTA: Wi-Fi on (low TX power), trying saved network");
 
   WiFiManager wm;
   wm.setDebugOutput(DEBUG_USB);
@@ -73,7 +85,8 @@ static bool otaConnect() {
   drawCentered(OTA_AP_NAME, 132, &FreeSansBold12pt7b, 1, C_GAME);
   drawCentered("then pick home Wi-Fi", 160, &FreeSans9pt7b, 1, C_WHITE);
   drawCentered("shake to cancel", 196, &FreeSans9pt7b, 1, C_RINGDIM);
-  if (DEBUG_USB) Serial.printf("OTA: setup hotspot %s\n", OTA_AP_NAME);
+  WiFi.setTxPower(OTA_TX_POWER);
+  if (DEBUG_USB) Serial.printf("OTA: setup hotspot %s is up\n", OTA_AP_NAME);
 
   shakeReset();
   uint32_t t0 = millis();

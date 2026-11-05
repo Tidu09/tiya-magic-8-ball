@@ -63,11 +63,14 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     2
+#define FW_VERSION     3
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 #define OTA_AP_NAME    "Tiya-8Ball"      // setup hotspot name
 #define OTA_CONNECT_S  15                // seconds to try the saved Wi-Fi
 #define OTA_PORTAL_S   240               // seconds the setup hotspot stays up
+// C3 SuperMini boards brown out / reset at full Wi-Fi power on a small
+// battery. 8.5 dBm is the well-known safe value and still fine at home range.
+#define OTA_TX_POWER   WIFI_POWER_8_5dBm
 
 // ---------------- Timing ----------------
 #define GREETING_MS   900
@@ -433,13 +436,24 @@ void setup() {
       displaySleep();
     }
   } else if (coldBoot) {
-    if (DEBUG_USB) Serial.printf("Cold boot: display test, firmware v%d\n", FW_VERSION);
+    // Why did we start? Shown small under the 8-ball so a surprise
+    // "switch off" (really a reset) can be diagnosed without a cable.
+    esp_reset_reason_t why = esp_reset_reason();
+    const char* whyTxt =
+        (why == ESP_RST_BROWNOUT) ? "power dip reset" :
+        (why == ESP_RST_PANIC)    ? "crash reset" :
+        (why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT || why == ESP_RST_WDT) ? "watchdog reset" :
+        (why == ESP_RST_SW)       ? "restarted" : NULL;
+    if (DEBUG_USB) Serial.printf("Cold boot: firmware v%d, reset reason %d (%s)\n",
+                                 FW_VERSION, (int)why, whyTxt ? whyTxt : "power on");
     displayOn();
     drawEightBall();
-    char ver[12];
-    snprintf(ver, sizeof(ver), "v%d", FW_VERSION);   // shows after power-on / an update
-    drawCentered(ver, 222, &FreeSans9pt7b, 1, C_RINGDIM);
-    delay(EIGHTBALL_MS);
+    char ver[32];
+    if (whyTxt) snprintf(ver, sizeof(ver), "v%d  %s", FW_VERSION, whyTxt);
+    else        snprintf(ver, sizeof(ver), "v%d", FW_VERSION);
+    drawCentered(ver, 222, &FreeSans9pt7b, 1,
+                 (whyTxt && why != ESP_RST_SW) ? C_DANGER : C_RINGDIM);
+    delay(whyTxt ? 4000 : EIGHTBALL_MS);           // linger if something odd happened
     displaySleep();
   }
 
