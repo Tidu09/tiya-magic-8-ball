@@ -1,0 +1,74 @@
+# Compiles the sketch for the ESP32-C3 on every push.
+# When FW_VERSION in Magic8Ball/Magic8Ball.ino is higher than the version in
+# firmware/version.txt, it publishes the new firmware.bin + version.txt,
+# which the keychain downloads from its "Update" menu.
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+    paths: ["Magic8Ball/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-firmware
+  cancel-in-progress: false
+
+env:
+  FQBN: esp32:esp32:esp32c3:PartitionScheme=min_spiffs,CDCOnBoot=cdc
+  ESP32_INDEX: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache Arduino core and libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-esp32-${{ hashFiles('.github/workflows/build.yml') }}
+
+      - name: Install ESP32 core and libraries
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls "$ESP32_INDEX"
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib update-index
+          arduino-cli lib install "Adafruit GFX Library" "Adafruit GC9A01A" "WiFiManager"
+          arduino-cli core list
+          arduino-cli lib list
+
+      - name: Compile
+        run: arduino-cli compile --fqbn "$FQBN" --warnings default --output-dir build Magic8Ball
+
+      - name: Publish if FW_VERSION went up
+        run: |
+          VER=$(grep -oP '^#define FW_VERSION\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          PUB=0
+          [ -f firmware/version.txt ] && PUB=$(cut -d' ' -f1 firmware/version.txt)
+          SIZE=$(stat -c %s build/Magic8Ball.ino.bin)
+          echo "Source FW_VERSION=$VER, published=$PUB, binary=$SIZE bytes"
+          if [ "$VER" -le "$PUB" ]; then
+            echo "Not newer than the published version: compile check only."
+            exit 0
+          fi
+          mkdir -p firmware
+          cp build/Magic8Ball.ino.bin firmware/firmware.bin
+          MD5=$(md5sum firmware/firmware.bin | cut -d' ' -f1)
+          echo "$VER $MD5 $SIZE" > firmware/version.txt
+          git config user.name  "firmware-bot"
+          git config user.email "firmware-bot@users.noreply.github.com"
+          git add firmware/firmware.bin firmware/version.txt
+          git commit -m "Publish firmware v$VER ($SIZE bytes)"
+          git pull --rebase origin main
+          git push origin HEAD:main
