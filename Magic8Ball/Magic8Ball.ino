@@ -63,7 +63,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     1
+#define FW_VERSION     2
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 #define OTA_AP_NAME    "Tiya-8Ball"      // setup hotspot name
 #define OTA_CONNECT_S  15                // seconds to try the saved Wi-Fi
@@ -433,9 +433,12 @@ void setup() {
       displaySleep();
     }
   } else if (coldBoot) {
-    if (DEBUG_USB) Serial.println("Cold boot: display test");
+    if (DEBUG_USB) Serial.printf("Cold boot: display test, firmware v%d\n", FW_VERSION);
     displayOn();
     drawEightBall();
+    char ver[12];
+    snprintf(ver, sizeof(ver), "v%d", FW_VERSION);   // shows after power-on / an update
+    drawCentered(ver, 222, &FreeSans9pt7b, 1, C_RINGDIM);
     delay(EIGHTBALL_MS);
     displaySleep();
   }
