@@ -440,9 +440,9 @@ void setup() {
     // "switch off" (really a reset) can be diagnosed without a cable.
     esp_reset_reason_t why = esp_reset_reason();
     const char* whyTxt =
-        (why == ESP_RST_BROWNOUT) ? "power dip reset" :
-        (why == ESP_RST_PANIC)    ? "crash reset" :
-        (why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT || why == ESP_RST_WDT) ? "watchdog reset" :
+        (why == ESP_RST_BROWNOUT) ? "power dip" :
+        (why == ESP_RST_PANIC)    ? "crashed" :
+        (why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT || why == ESP_RST_WDT) ? "watchdog" :
         (why == ESP_RST_SW)       ? "restarted" : NULL;
     if (DEBUG_USB) Serial.printf("Cold boot: firmware v%d, reset reason %d (%s)\n",
                                  FW_VERSION, (int)why, whyTxt ? whyTxt : "power on");
