@@ -67,11 +67,22 @@ jobs:
             exit 0
           fi
           mkdir -p firmware
+          # fw-<N>.bin: a new file name per version, so no CDN can serve a
+          # stale binary. firmware.bin is kept for keychains on v5 or older.
+          git rm -q --ignore-unmatch firmware/fw-*.bin
+          cp build/Magic8Ball.ino.bin "firmware/fw-$VER.bin"
           cp build/Magic8Ball.ino.bin firmware/firmware.bin
           MD5=$(md5sum firmware/firmware.bin | cut -d' ' -f1)
-          echo "$VER $MD5 $SIZE" > firmware/version.txt
+          echo "$VER $MD5 $SIZE fw-$VER.bin" > firmware/version.txt
           git config user.name  "firmware-bot"
           git config user.email "firmware-bot@users.noreply.github.com"
-          git add firmware/firmware.bin firmware/version.txt
+          git add firmware/
           git commit -m "Publish firmware v$VER ($SIZE bytes)"
           git push origin publish:main
+
+      - name: Refresh the jsDelivr mirror
+        if: success()
+        run: |
+          for f in version.txt firmware.bin; do
+            curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/firmware/$f" | head -c 300; echo
+          done
