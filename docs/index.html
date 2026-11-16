@@ -94,9 +94,6 @@
     <div class="toggle"><span>Get angry when I use my phone</span>
       <label class="sw" style="margin:0"><input type="checkbox" id="check" checked><span></span></label></div>
 
-    <label>Message on Beep at the start</label>
-    <input type="text" id="note" maxlength="40" placeholder="e.g. You got this, Tiya!">
-
     <button id="save">Save to Beep</button>
     <div class="saved" id="saved"></div>
     <div class="note">Beep picks these up when you start him (right-tilt after shaking).</div>
@@ -231,14 +228,11 @@ function fillForm(j) {
   if (j.rounds) $("rounds").value = j.rounds;
   if (j.color !== undefined) color = Math.min(COLORS.length - 1, j.color | 0);
   if (j.check !== undefined) $("check").checked = !!j.check;
-  if (j.note !== undefined) $("note").value = j.note;
   ["focus", "brk", "rounds"].forEach((id) => $(id).oninput());
   chips(); setAccent();
 }
 $("save").onclick = () => {
-  const note = $("note").value.replace(/[^\x20-\x7e]/g, "").trim().slice(0, 40);   // Beep's font is plain text
-  $("note").value = note;
-  const s = { focus: +$("focus").value, brk: +$("brk").value, rounds: +$("rounds").value, color, check: $("check").checked ? 1 : 0, note };
+  const s = { focus: +$("focus").value, brk: +$("brk").value, rounds: +$("rounds").value, color, check: $("check").checked ? 1 : 0, note: "" };
   const ok = pub("settings", JSON.stringify(s), true);
   try { localStorage.setItem("beepSettings", JSON.stringify(s)); } catch (e) {}
   $("saved").textContent = ok ? "Saved. Beep will use this next time he starts." : "Not connected yet, try again in a moment.";
@@ -260,7 +254,7 @@ function render() {
   if (fresh && (status.ph === "focus" || status.ph === "break") && !status.angry) left = statusClock - (Date.now() - statusAt) / 1000;
   const t = (status.ph === "focus" || status.ph === "break") ? mmss(left) : status.ph === "done" ? "done" : "--:--";
   $("time").textContent = t; $("sTime").textContent = t;
-  const ph = { hello: "Beep is waking up", note: "Beep is showing your message", focus: `Focus ${status.r}/${status.of}`,
+  const ph = { hello: "Beep is waking up", focus: `Focus ${status.r}/${status.of}`,
     break: `Break ${status.r}/${status.of}: phone allowed`, done: `Finished: ${status.done} round${status.done === 1 ? "" : "s"}` }[status.ph] || "";
   const mood = MOOD[status.mood] ? " · Beep " + MOOD[status.mood] : "";
   $("phase").textContent = fresh ? ph + mood : "Beep is asleep or out of Wi-Fi range";

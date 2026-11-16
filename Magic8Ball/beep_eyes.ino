@@ -369,9 +369,3 @@ void beepDrawRounds(Adafruit_GFX& g, int done, int current, int of, uint16_t c) 
     else                      g.drawCircle(x, y, 3, be_blend(BE_BG, c, 0.35f));
   }
 }
-
-// Small canvas: a short line of text
-void beepDrawTimer(Adafruit_GFX& g, const char* s, uint16_t c) {
-  g.fillScreen(BE_BG);
-  be_text(g, s, BEEP_TM_W / 2, BEEP_TM_H / 2, &FreeSans9pt7b, c);
-}

@@ -103,7 +103,8 @@ in `docs/` (GitHub Pages: https://tidu09.github.io/tiya-magic-8-ball/).
   shake = dizzy (again while dizzy = quit), laid flat = squint.
 - Screen: big seven-segment clock in the middle during focus/break, round dots
   underneath; eyes take over for reactions, wiggles and a random peek (45-90 s,
-  20-40 s on breaks). No rim ring, no header text.
+  20-40 s on breaks). No words on the face at all: no ring, no header, no
+  status text; waking up = happy eyes, done = eyes + filled round dots.
 - Power: Wi-Fi max modem sleep, 8.5 dBm, static eyes redraw only on change,
   animated ones at ~12 fps, radio off at the end.
 - Previews: the eye code is pure Adafruit_GFX, so it can be compiled on a PC

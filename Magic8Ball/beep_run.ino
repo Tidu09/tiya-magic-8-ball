@@ -5,9 +5,9 @@
 //         during "Hi Tiya!" (left edge down = games, as before).
 //         Also the first row of the game menu.
 //
+//  No words on the face, ever: only eyes, drawings, the clock and round dots.
 //  1. HELLO  happy eyes; joins the saved Wi-Fi (the one set up for Update)
 //            and the phone page's message relay, reads her settings.
-//  2. NOTE   shows the message typed on the page, if there is one.
 //  3. FOCUS  big clock in the middle (eyes peek out now and then, and for
 //            every reaction). If the page is linked and she leaves it or picks
 //            the phone up: side-eye, then ANGRY and the timer pauses.
@@ -26,7 +26,6 @@
 // =====================================================================
 
 #define BP_HELLO 0
-#define BP_NOTE  1
 #define BP_FOCUS 2
 #define BP_BREAK 3
 #define BP_DONE  4
@@ -320,43 +319,6 @@ static void bp_tiltLook(float &lx, float &ly) {
 // =====================================================================
 //  Drawing helpers (screen furniture lives in beep_eyes.ino)
 // =====================================================================
-static void bp_drawNote(Adafruit_GFX& g, const char* note) {
-  g.fillScreen(0);
-  char words[12][24];
-  int nw = 0;
-  char buf[48];
-  strncpy(buf, note, sizeof(buf));
-  buf[sizeof(buf) - 1] = 0;
-  for (char* p = strtok(buf, " "); p && nw < 12; p = strtok(NULL, " ")) {
-    strncpy(words[nw], p, 23);
-    words[nw][23] = 0;
-    nw++;
-  }
-  const GFXfont* f = &FreeSansBold12pt7b;
-  g.setFont(f);
-  g.setTextSize(1);
-  char lines[4][48];
-  int nl = 0, i = 0;
-  while (i < nw && nl < 4) {
-    strcpy(lines[nl], words[i++]);
-    while (i < nw) {
-      char t[48];
-      snprintf(t, sizeof(t), "%s %s", lines[nl], words[i]);
-      int16_t x1, y1;
-      uint16_t w, h;
-      g.getTextBounds(t, 0, 0, &x1, &y1, &w, &h);
-      if (w > BEEP_CV_W - 16) break;
-      strcpy(lines[nl], t);
-      i++;
-    }
-    nl++;
-  }
-  int lh = f->yAdvance;
-  int top = BEEP_CV_H / 2 - nl * lh / 2;
-  for (int k = 0; k < nl; k++)
-    be_text(g, lines[k], BEEP_CV_W / 2, top + k * lh + lh / 2, f, BE_WHITE);
-}
-
 static void bp_pushEyes() {
   tft.drawRGBBitmap(BEEP_CV_X, BEEP_CV_Y, bp_cv->getBuffer(), BEEP_CV_W, BEEP_CV_H);
 }
@@ -478,7 +440,7 @@ int runBeep() {
     if (gesture && DEBUG_USB) Serial.printf("Beep gesture %d\n", gesture);
 
     if (quitAsk && phase != BP_DONE) {
-      quitEarly = (phase == BP_FOCUS || phase == BP_BREAK || phase == BP_NOTE);
+      quitEarly = (phase == BP_FOCUS || phase == BP_BREAK);
       doneStyle = quitEarly ? BEEP_CRY : BEEP_HEART;
       phase = BP_DONE;
       phaseStart = now;
@@ -495,23 +457,15 @@ int runBeep() {
                               now - phaseStart > BEEP_WIFI_MS;                    // no Wi-Fi
       if (now - phaseStart > 2500 && settingsWaitOver) {
         f.color = BEEP_COLORS[bp_cfg.color];
-        phase = bp_cfg.note[0] ? BP_NOTE : BP_FOCUS;
+        phase = BP_FOCUS;                         // no words on the face: straight to the clock
         phaseStart = now;
-        if (phase == BP_FOCUS) { left = total = bp_cfg.focusMin * 60000L; ambient = BEEP_FOCUSED; }
+        left = total = bp_cfg.focusMin * 60000L;
+        ambient = BEEP_FOCUSED;
         sessionCap = now + (uint32_t)bp_cfg.rounds * (bp_cfg.focusMin + bp_cfg.breakMin) * 60000UL
                          + 15UL * 60000UL;
         statusDirty = true;
         if (DEBUG_USB) Serial.printf("Beep: %s, %s\n", bp_wifiEverOk ? "Wi-Fi ok" : "offline",
                                      online ? "relay ok" : "no relay");
-      }
-    } else if (phase == BP_NOTE) {
-      if (now - phaseStart > 3500) {
-        phase = BP_FOCUS;
-        phaseStart = now;
-        left = total = bp_cfg.focusMin * 60000L;
-        ambient = BEEP_FOCUSED;
-        lastKey = 0xFFFFFFFF;
-        statusDirty = true;
       }
     } else if (phase == BP_FOCUS) {
       // ---- the phone check ----
@@ -602,7 +556,7 @@ int runBeep() {
 
     // ---------------- status to the page ----------------
     if (online && (statusDirty || now - lastStatus > BEEP_STATUS_MS)) {
-      static const char* const PH[5] = {"hello", "note", "focus", "break", "done"};
+      static const char* const PH[5] = {"hello", "-", "focus", "break", "done"};
       char st[200];
       snprintf(st, sizeof(st),
                "{\"ph\":\"%s\",\"left\":%ld,\"tot\":%ld,\"r\":%d,\"of\":%d,\"done\":%d,"
@@ -674,12 +628,10 @@ int runBeep() {
     // and when Beep peeks out every so often.
     bool timerPhase = (phase == BP_FOCUS || phase == BP_BREAK);
     bool eyesNow = !timerPhase || angry || warn || (evStyle != 255 && now < evUntil) || now < peekUntil;
-    int mode = (phase == BP_NOTE) ? 2 : eyesNow ? 0 : 1;
+    int mode = eyesNow ? 0 : 1;
     uint16_t phaseCol = (phase == BP_BREAK) ? BP_MINT : f.color;
 
-    if (mode == 2) {
-      if (shownMode != 2) { bp_drawNote(*bp_cv, bp_cfg.note); bp_pushEyes(); }
-    } else if (mode == 1) {
+    if (mode == 1) {
       long secs = (left + 999) / 1000;
       if (secs < 0) secs = 0;
       if (shownMode != 1 || secs != shownSecs || phaseCol != shownClockCol) {
@@ -704,27 +656,16 @@ int runBeep() {
     }
     shownMode = mode;
 
-    // Under the centre: round dots while studying, a few words otherwise
+    // Under the centre: round dots only (no words anywhere on the face).
+    // While waking up: nothing. When done: every finished round filled in.
     char tm[24];
-    uint16_t tcol = C_WHITE;
-    if (timerPhase) {
-      snprintf(tm, sizeof(tm), "#%d/%d/%d", done, round, bp_cfg.rounds);   // cache key only
-      tcol = phaseCol;
-    } else if (phase == BP_HELLO) {
-      strcpy(tm, online ? (bp_gotSettings ? "linked!" : "linked") :
-                 bp_wifiEverOk ? "connecting" :
-                 now - phaseStart > 4000 ? "finding Wi-Fi" : "hi Tiya!");
-    } else if (phase == BP_NOTE) {
-      strcpy(tm, "");
-    } else {
-      if (quitEarly)   strcpy(tm, "quit early");
-      else if (gaveUp) strcpy(tm, "phone won");
-      else snprintf(tm, sizeof(tm), "%d done%s", done, record ? " - best!" : "");
-      tcol = quitEarly ? BE_BLUE : C_WHITE;
-    }
+    uint16_t tcol = timerPhase ? phaseCol : f.color;
+    if (timerPhase)           snprintf(tm, sizeof(tm), "%d/%d/%d", done, round, bp_cfg.rounds);
+    else if (phase == BP_DONE) snprintf(tm, sizeof(tm), "%d/0/%d", done, bp_cfg.rounds);
+    else                       strcpy(tm, "-");
     if (strcmp(tm, shownTimer) || tcol != shownTimerCol) {
-      if (timerPhase) beepDrawRounds(*bp_tv, done, round, bp_cfg.rounds, tcol);
-      else            beepDrawTimer(*bp_tv, tm, tcol);
+      if (phase == BP_HELLO) bp_tv->fillScreen(0);
+      else beepDrawRounds(*bp_tv, done, timerPhase ? round : 0, bp_cfg.rounds, tcol);
       bp_pushTimer();
       strcpy(shownTimer, tm);
       shownTimerCol = tcol;
