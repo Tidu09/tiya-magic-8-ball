@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0714">
+<title>Beep</title>
+<style>
+  :root { --c: #b541ff; --bg: #0b0714; --card: #160f24; --line: #2a2040; --text: #efeaf7; --dim: #9a90ad; --red: #ff4a4a; --mint: #39ff94; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 40px; }
+  h1 { font-size: 28px; margin: 4px 0 0; letter-spacing: -0.5px; }
+  .sub { color: var(--dim); font-size: 14px; margin: 2px 0 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin: 12px 0; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
+  .face { width: 132px; height: 132px; border-radius: 50%; background: #000; margin: 6px auto 4px; display: flex; align-items: center; justify-content: center; gap: 22px; border: 3px solid #241a36; box-shadow: 0 0 40px -12px var(--c); }
+  .eye { width: 22px; height: 36px; border-radius: 12px; background: var(--c); animation: blink 4.5s infinite; transition: background .3s, transform .3s; }
+  .angry .eye { background: var(--red); border-radius: 6px 6px 12px 12px; }
+  .angry .eye:first-child { transform: skewY(18deg); } .angry .eye:last-child { transform: skewY(-18deg); }
+  @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+  .status { text-align: center; }
+  .big { font-size: 46px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 13px; background: #241a36; color: var(--dim); margin: 2px; }
+  .pill.ok { color: var(--mint); } .pill.bad { color: var(--red); }
+  label { display: block; font-size: 14px; color: var(--dim); margin: 12px 0 4px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  input[type=range] { flex: 1; accent-color: var(--c); }
+  .val { min-width: 56px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  input[type=text] { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: #0f0a1a; color: var(--text); font-size: 16px; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip { width: 38px; height: 38px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .chip.on { border-color: #fff; }
+  .toggle { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .sw { position: relative; width: 50px; height: 30px; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: #3a3050; border-radius: 99px; transition: .2s; }
+  .sw span:before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .sw input:checked + span { background: var(--c); } .sw input:checked + span:before { transform: translateX(20px); }
+  button { width: 100%; padding: 15px; border-radius: 14px; border: 0; font-size: 17px; font-weight: 600; background: var(--c); color: #120a1d; margin-top: 12px; }
+  button.ghost { background: #241a36; color: var(--text); }
+  button:disabled { opacity: .5; }
+  .two { display: flex; gap: 10px; } .two button { flex: 1; }
+  .note { font-size: 13px; color: var(--dim); }
+  .saved { color: var(--mint); font-size: 14px; text-align: center; height: 18px; margin-top: 8px; }
+  ul.how { padding-left: 18px; margin: 0; color: var(--dim); font-size: 14px; } ul.how li { margin: 4px 0; }
+  ul.how b { color: var(--text); font-weight: 600; }
+  /* study mode */
+  #study { position: fixed; inset: 0; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; z-index: 9; }
+  #study.on { display: flex; }
+  #study .face { width: 170px; height: 170px; gap: 28px; }
+  #study .eye { width: 28px; height: 46px; }
+  #study .big { color: #6d6380; margin-top: 18px; }
+  #study p { color: #6d6380; max-width: 300px; }
+  #study button { max-width: 300px; background: #1a1424; color: #8d84a0; }
+  #sWarn { color: var(--red); font-weight: 600; min-height: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Beep</h1>
+  <div class="sub">Tiya's study buddy</div>
+
+  <div class="card status">
+    <div class="face" id="face"><div class="eye"></div><div class="eye"></div></div>
+    <div class="big" id="time">--:--</div>
+    <div id="phase" class="note">Waiting for Beep...</div>
+    <div style="margin-top:8px">
+      <span class="pill" id="pLink">relay: connecting</span>
+      <span class="pill" id="pBeep">Beep: not seen</span>
+      <span class="pill" id="pStrikes">0 crash-outs</span>
+    </div>
+    <button id="goStudy">Start study mode</button>
+    <div class="two">
+      <button class="ghost" id="skip">Skip break</button>
+      <button class="ghost" id="stop">End session</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timer</h2>
+    <label>Focus</label>
+    <div class="row"><input type="range" id="focus" min="5" max="60" step="5" value="25"><span class="val" id="focusV">25 min</span></div>
+    <label>Break</label>
+    <div class="row"><input type="range" id="brk" min="1" max="20" step="1" value="5"><span class="val" id="brkV">5 min</span></div>
+    <label>Rounds</label>
+    <div class="row"><input type="range" id="rounds" min="1" max="8" step="1" value="4"><span class="val" id="roundsV">4</span></div>
+
+    <label>Eye colour</label>
+    <div class="chips" id="chips"></div>
+
+    <div class="toggle"><span>Get angry when I use my phone</span>
+      <label class="sw" style="margin:0"><input type="checkbox" id="check" checked><span></span></label></div>
+
+    <label>Message on Beep at the start</label>
+    <input type="text" id="note" maxlength="40" placeholder="e.g. You got this, Tiya!">
+
+    <button id="save">Save to Beep</button>
+    <div class="saved" id="saved"></div>
+    <div class="note">Beep picks these up when you start him (right-tilt after shaking).</div>
+  </div>
+
+  <div class="card" id="reportCard" style="display:none">
+    <h2>Last session</h2>
+    <div id="report"></div>
+  </div>
+
+  <div class="card">
+    <h2>How it works</h2>
+    <ul class="how">
+      <li><b>Start Beep:</b> shake the keychain, then tip it onto its <b>right</b> edge while it says "Hi Tiya!".</li>
+      <li><b>Start study mode</b> here, then put the phone <b>face down</b>. Leave this page or pick the phone up and Beep gets angry and pauses the timer.</li>
+      <li><b>Wiggle up-down:</b> cute eyes. <b>Wiggle side-to-side:</b> trippy eyes.</li>
+      <li><b>Shake hard:</b> dizzy. Shake hard again while dizzy to quit.</li>
+      <li>Lay him flat and he squints, because he hates light.</li>
+    </ul>
+  </div>
+</main>
+
+<div id="study">
+  <div class="face" id="sFace"><div class="eye"></div><div class="eye"></div></div>
+  <div class="big" id="sTime">--:--</div>
+  <p id="sMsg">Put your phone face down. Beep is watching.</p>
+  <div id="sWarn"></div>
+  <button id="exitStudy">Leave study mode</button>
+</div>
+
+<script>
+// ---- must match the firmware (Magic8Ball.ino) ----
+const TOPIC = "tiyabeep/q7Lm2xR9pK4w";
+const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
+const COLORS = ["#b541ff", "#00ffff", "#ff4589", "#39ff94", "#ffa500", "#ffffff"];
+
+// ---------------- tiny MQTT 3.1.1 client over WebSocket (QoS 0) ----------------
+class Mqtt {
+  constructor(url, onMsg, onState) {
+    this.url = url; this.onMsg = onMsg; this.onState = onState; this.ok = false; this.subs = [];
+    this.id = "beep-page-" + Math.random().toString(36).slice(2, 10);
+    this.connect();
+  }
+  static str(s) { const b = new TextEncoder().encode(s); return [b.length >> 8, b.length & 255, ...b]; }
+  static len(n) { const o = []; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; o.push(d); } while (n > 0); return o; }
+  send(type, body) { if (this.ws && this.ws.readyState === 1) this.ws.send(new Uint8Array([type, ...Mqtt.len(body.length), ...body])); }
+  connect() {
+    try { this.ws = new WebSocket(this.url, ["mqtt"]); } catch (e) { setTimeout(() => this.connect(), 4000); return; }
+    this.ws.binaryType = "arraybuffer";
+    this.buf = new Uint8Array(0);
+    this.ws.onopen = () => this.send(0x10, [...Mqtt.str("MQTT"), 4, 0x02, 0, 30, ...Mqtt.str(this.id)]);
+    this.ws.onmessage = (ev) => this.data(new Uint8Array(ev.data));
+    this.ws.onclose = () => { this.setOk(false); clearInterval(this.ping); setTimeout(() => this.connect(), 3000); };
+    this.ws.onerror = () => { try { this.ws.close(); } catch (e) {} };
+  }
+  setOk(v) { if (this.ok !== v) { this.ok = v; this.onState(); } }
+  data(chunk) {
+    const b = new Uint8Array(this.buf.length + chunk.length); b.set(this.buf); b.set(chunk, this.buf.length); this.buf = b;
+    for (;;) {
+      if (this.buf.length < 2) return;
+      let mult = 1, rem = 0, i = 1, d;
+      do { if (i >= this.buf.length) return; d = this.buf[i++]; rem += (d & 127) * mult; mult *= 128; } while (d & 128);
+      if (this.buf.length < i + rem) return;
+      const type = this.buf[0] >> 4, flags = this.buf[0] & 15, p = this.buf.slice(i, i + rem);
+      this.buf = this.buf.slice(i + rem);
+      if (type === 2) {                                   // CONNACK
+        if (p[1] === 0) {
+          this.setOk(true);
+          if (this.subs.length) this.subscribe(this.subs, true);
+          clearInterval(this.ping); this.ping = setInterval(() => this.send(0xC0, []), 25000);
+        }
+      } else if (type === 3) {                            // PUBLISH
+        const tl = (p[0] << 8) | p[1];
+        const topic = new TextDecoder().decode(p.slice(2, 2 + tl));
+        const off = 2 + tl + (((flags >> 1) & 3) ? 2 : 0);
+        this.onMsg(topic, new TextDecoder().decode(p.slice(off)));
+      }
+    }
+  }
+  subscribe(topics, again) {
+    if (!again) this.subs.push(...topics);
+    if (!this.ok) return;
+    const body = [0, 1]; for (const t of topics) body.push(...Mqtt.str(t), 0);
+    this.send(0x82, body);
+  }
+  publish(topic, msg, retain) {
+    if (!this.ok) return false;
+    this.send(0x30 | (retain ? 1 : 0), [...Mqtt.str(topic), ...new TextEncoder().encode(msg)]);
+    return true;
+  }
+}
+
+// ---------------- app ----------------
+const $ = (id) => document.getElementById(id);
+let status = null, statusAt = 0, statusClock = 0, settingsLoaded = false, color = 0;
+const clients = BROKERS.map((u) => new Mqtt(u, onMsg, linkUi));
+clients.forEach((c) => c.subscribe([TOPIC + "/status", TOPIC + "/report", TOPIC + "/settings"]));
+function pub(leaf, msg, retain) { let any = false; clients.forEach((c) => { any = c.publish(TOPIC + "/" + leaf, msg, retain) || any; }); return any; }
+
+function onMsg(topic, msg) {
+  const leaf = topic.split("/").pop();
+  let j; try { j = JSON.parse(msg); } catch (e) { return; }
+  if (leaf === "status") { status = j; statusAt = Date.now(); statusClock = j.left; render(); }
+  else if (leaf === "report") showReport(j);
+  else if (leaf === "settings" && !settingsLoaded) { settingsLoaded = true; fillForm(j); }
+}
+
+function linkUi() {
+  const ok = clients.some((c) => c.ok);
+  $("pLink").textContent = ok ? "relay: connected" : "relay: connecting";
+  $("pLink").className = "pill " + (ok ? "ok" : "");
+}
+
+// ---------------- settings form ----------------
+function fmtMin(v) { return v + " min"; }
+for (const [id, f] of [["focus", fmtMin], ["brk", fmtMin], ["rounds", (v) => v]]) {
+  const el = $(id); el.oninput = () => { $(id + "V").textContent = f(el.value); };
+}
+function chips() {
+  $("chips").innerHTML = "";
+  COLORS.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "chip" + (i === color ? " on" : ""); d.style.background = c;
+    d.onclick = () => { color = i; chips(); setAccent(); };
+    $("chips").appendChild(d);
+  });
+}
+function setAccent() { document.documentElement.style.setProperty("--c", COLORS[color]); }
+function fillForm(j) {
+  if (j.focus) $("focus").value = j.focus;
+  if (j.brk) $("brk").value = j.brk;
+  if (j.rounds) $("rounds").value = j.rounds;
+  if (j.color !== undefined) color = Math.min(COLORS.length - 1, j.color | 0);
+  if (j.check !== undefined) $("check").checked = !!j.check;
+  if (j.note !== undefined) $("note").value = j.note;
+  ["focus", "brk", "rounds"].forEach((id) => $(id).oninput());
+  chips(); setAccent();
+}
+$("save").onclick = () => {
+  const note = $("note").value.replace(/[^\x20-\x7e]/g, "").trim().slice(0, 40);   // Beep's font is plain text
+  $("note").value = note;
+  const s = { focus: +$("focus").value, brk: +$("brk").value, rounds: +$("rounds").value, color, check: $("check").checked ? 1 : 0, note };
+  const ok = pub("settings", JSON.stringify(s), true);
+  try { localStorage.setItem("beepSettings", JSON.stringify(s)); } catch (e) {}
+  $("saved").textContent = ok ? "Saved. Beep will use this next time he starts." : "Not connected yet, try again in a moment.";
+  setTimeout(() => ($("saved").textContent = ""), 4000);
+};
+try { const s = JSON.parse(localStorage.getItem("beepSettings")); if (s) fillForm(s); else chips(); } catch (e) { chips(); }
+setAccent();
+
+// ---------------- live status ----------------
+const MOOD = { angry: "is ANGRY", sideeye: "is giving you side-eye", cry: "is crying", dizzy: "is dizzy",
+  sleepy: "is sleepy", heart: "loves you", star: "is starstruck", hypno: "is hypnotised", squint: "hates the light" };
+function mmss(s) { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function render() {
+  const fresh = status && Date.now() - statusAt < 15000;
+  $("pBeep").textContent = fresh ? "Beep: online" : status ? "Beep: offline" : "Beep: not seen";
+  $("pBeep").className = "pill " + (fresh ? "ok" : "");
+  if (!status) return;
+  let left = status.left;
+  if (fresh && (status.ph === "focus" || status.ph === "break") && !status.angry) left = statusClock - (Date.now() - statusAt) / 1000;
+  const t = (status.ph === "focus" || status.ph === "break") ? mmss(left) : status.ph === "done" ? "done" : "--:--";
+  $("time").textContent = t; $("sTime").textContent = t;
+  const ph = { hello: "Beep is waking up", note: "Beep is showing your message", focus: `Focus ${status.r}/${status.of}`,
+    break: `Break ${status.r}/${status.of}: phone allowed`, done: `Finished: ${status.done} round${status.done === 1 ? "" : "s"}` }[status.ph] || "";
+  const mood = MOOD[status.mood] ? " · Beep " + MOOD[status.mood] : "";
+  $("phase").textContent = fresh ? ph + mood : "Beep is asleep or out of Wi-Fi range";
+  $("pStrikes").textContent = status.strikes + " crash-out" + (status.strikes === 1 ? "" : "s");
+  $("pStrikes").className = "pill " + (status.strikes ? "bad" : "");
+  const angry = fresh && status.angry;
+  $("face").classList.toggle("angry", !!angry); $("sFace").classList.toggle("angry", !!angry);
+  $("sWarn").textContent = angry ? "Beep is angry! Timer paused. Put the phone down." : (fresh && status.warn ? "Beep is suspicious..." : "");
+}
+setInterval(render, 500);
+
+function showReport(j) {
+  $("reportCard").style.display = "";
+  const end = { finished: "Finished", quit: "Quit early", gaveup: "Beep gave up waiting" }[j.end] || "";
+  $("report").innerHTML = `<div class="big" style="font-size:34px">${j.done}/${j.of} rounds</div>
+    <div class="note">${end} · ${j.done * j.min} min focused · ${j.strikes} crash-out${j.strikes === 1 ? "" : "s"}${j.record ? " · new best!" : ""}</div>`;
+}
+
+$("skip").onclick = () => pub("cmd", "skip", false);
+$("stop").onclick = () => { if (confirm("End the study session on Beep?")) pub("cmd", "stop", false); };
+
+// ---------------- study mode: the phone check ----------------
+// While this screen is up and the phone lies face down, the page tells Beep
+// "1" (all good) every second. Picked up -> "2". Page hidden or closed -> "0",
+// and on iPhone Safari freezes the page, so the "1"s simply stop. Either way
+// Beep notices within a couple of seconds.
+let studying = false, hbTimer = null, wake = null, beta = null, notDownSince = 0, motionOk = false;
+async function enterStudy() {
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    try { motionOk = (await DeviceOrientationEvent.requestPermission()) === "granted"; } catch (e) { motionOk = false; }
+  } else motionOk = "DeviceOrientationEvent" in window;
+  if (motionOk) window.addEventListener("deviceorientation", onOrient);
+  try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) { wake = null; }
+  studying = true; $("study").classList.add("on");
+  $("sMsg").textContent = (motionOk ? "Put your phone face down. " : "Leave this screen open. ") + "Beep is watching." +
+    (wake ? "" : " (Turn off Auto-Lock while studying, or the phone locking will make Beep angry.)");
+  clearInterval(hbTimer); hbTimer = setInterval(beat, 1000); beat();
+}
+function onOrient(e) { if (e.beta !== null) beta = e.beta; }
+function beat() {
+  if (!studying || document.visibilityState !== "visible") return;
+  let v = "1";
+  if (motionOk && beta !== null) {
+    const down = Math.abs(beta) > 140;              // lying screen-down
+    if (down) notDownSince = 0; else if (!notDownSince) notDownSince = Date.now();
+    if (notDownSince && Date.now() - notDownSince > 2000) v = "2";
+  }
+  pub("hb", v, false);
+}
+function exitStudy() {
+  studying = false; $("study").classList.remove("on"); clearInterval(hbTimer);
+  pub("hb", "0", false);
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+}
+document.addEventListener("visibilitychange", async () => {
+  if (!studying) return;
+  if (document.visibilityState === "hidden") pub("hb", "0", false);
+  else { try { if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen"); } catch (e) {} beat(); }
+});
+$("goStudy").onclick = enterStudy;
+$("exitStudy").onclick = exitStudy;
+</script>
+</body>
+</html>

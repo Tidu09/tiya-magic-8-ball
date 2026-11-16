@@ -15,6 +15,8 @@ The IDE shows the rest as tabs automatically.
 | `game_maze.ino` | marble maze |
 | `game_platform.ino` | platformer |
 | `game_roulette.ino` | European roulette (0-36) |
+| `beep_eyes.ino` | Beep's 17 eye styles + timer/ring/header drawing (pure Adafruit_GFX) |
+| `beep_run.ino` | Beep session: Pomodoro, phone check over MQTT, gestures |
 | `ota.ino` | over-the-air update from GitHub (Wi-Fi setup hotspot, download, restart) |
 
 Rules that keep this working: constants and globals live only in the main tab,
@@ -41,7 +43,8 @@ newer version from GitHub (`Tidu09/tiya-magic-8-ball`, folder `firmware/`).
 ## Controls
 
 - **Shake** → 8-ball answer (default).
-- **Shake, then hold the clip edge-on** during "Hi Tiya!" → calibration → game menu.
+- **Shake, then hold the clip edge-on, LEFT edge down** during "Hi Tiya!" → calibration → game menu.
+- **Shake, then hold it edge-on, RIGHT edge down** → **Beep** (study buddy). Also the first menu row.
 - **Menu:** FLICK the clip (one quick jerk, not a tilt) to move to the next entry,
   wrapping round. Hold SIDEWAYS ~0.8 s to start. Shake, or do nothing for 20 s,
   to sleep. Tune with `MENU_FLICK_G` (lower = easier flick).
@@ -81,3 +84,24 @@ screen away moves them DOWN.
 
 High scores are one NVS key per game (`bestRun`, `bestSnake`, `bestMaze`, `bestPlat`, `bestRoul`) in the
 `m8b` namespace, written only when a score improves.
+
+## Beep (study buddy)
+
+Pomodoro timer with eyes. Settings and the phone check come from the web page
+in `docs/` (GitHub Pages: https://tidu09.github.io/tiya-magic-8-ball/).
+
+- The page and the keychain meet on a public MQTT broker (`broker.emqx.io`,
+  backup `broker.hivemq.com`) under `BEEP_TOPIC`. Page -> keychain:
+  `settings` (retained JSON), `hb` (1 = face down, 2 = picked up, 0 = left
+  the page), `cmd` (stop / skip). Keychain -> page: `status`, `report` (retained).
+- Wi-Fi is the network saved by the Update setup. No Wi-Fi = runs offline with
+  the last saved settings and no phone check.
+- During focus, once the page has linked: no "1" heartbeat for 2.2 s ->
+  side-eye; 2.3 s more -> angry, timer paused, strike +1. Strike 2 = red eyes,
+  strike 3+ = shaking crash-out. Angry for 10 min -> session ends (battery).
+- Gestures: up-down wiggle = cute eyes, side-side wiggle = trippy eyes, hard
+  shake = dizzy (again while dizzy = quit), laid flat = squint.
+- Power: Wi-Fi max modem sleep, 8.5 dBm, static eyes redraw only on change,
+  animated ones at ~12 fps, radio off at the end.
+- Previews: the eye code is pure Adafruit_GFX, so it can be compiled on a PC
+  with a stub Arduino.h and rendered to PNG.

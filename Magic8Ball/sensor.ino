@@ -144,10 +144,13 @@ bool waitForStill(uint32_t timeoutMs) {
 }
 
 // ---------------- Mode select ----------------
-// Held edge-on during the greeting = the user wants the games
-bool wantsGame(uint32_t windowMs) {
+// Held edge-on during the greeting:
+//   RIGHT edge down          -> Beep (study buddy)           returns 2
+//   left edge (or top/bottom) down -> the games              returns 1
+// Otherwise (flat / upright)  -> 8-ball answer               returns 0
+int senseMode(uint32_t windowMs) {
   uint32_t start = millis();
-  int total = 0, edge = 0;
+  int total = 0, edge = 0, rightDown = 0;
   while (millis() - start < windowMs) {
     float a[3];
     if (sampleAccel(a)) {
@@ -155,14 +158,21 @@ bool wantsGame(uint32_t windowMs) {
       if (mag > 0.6f && mag < 1.6f) {                 // ignore samples during motion
         if (millis() - start > windowMs / 3) {        // ignore the first third
           total++;
-          if (fabsf(a[SCREEN_NORMAL_AXIS]) / mag < GAME_TILT_COS) edge++;
+          if (fabsf(a[SCREEN_NORMAL_AXIS]) / mag < GAME_TILT_COS) {
+            edge++;
+            // same sign convention as screenAngles(): r > 0 = right edge tipped down
+            if (a[SCREEN_RIGHT_AXIS] * SCREEN_RIGHT_SIGN / mag > 0.5f) rightDown++;
+          }
         }
       }
     }
     delay(15);
   }
-  if (DEBUG_USB) Serial.printf("Mode sense: %d/%d edge-on\n", edge, total);
-  return total >= 6 && edge > (total * 3) / 5;
+  int mode = 0;
+  if (total >= 6 && edge > (total * 3) / 5) mode = (rightDown > (edge * 3) / 5) ? 2 : 1;
+  if (DEBUG_USB) Serial.printf("Mode sense: %d/%d edge-on, %d right-down -> %s\n", edge, total,
+                               rightDown, mode == 2 ? "Beep" : mode == 1 ? "games" : "8-ball");
+  return mode;
 }
 
 // ---------------- Calibration ----------------

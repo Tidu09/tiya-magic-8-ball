@@ -44,7 +44,7 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
           arduino-cli lib update-index
-          arduino-cli lib install "Adafruit GFX Library" "Adafruit GC9A01A" "WiFiManager"
+          arduino-cli lib install "Adafruit GFX Library" "Adafruit GC9A01A" "WiFiManager" "PubSubClient"
           arduino-cli core list
           arduino-cli lib list
 

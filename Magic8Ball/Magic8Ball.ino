@@ -4,7 +4,8 @@
  *
  * Shake -> "Hi Tiya!" greeting
  *            held flat/upright  -> 8-ball answer (default)
- *            held edge-on (>60) -> calibrate -> game menu
+ *            held edge-on, left edge down  -> calibrate -> game menu
+ *            held edge-on, RIGHT edge down -> Beep study buddy (beep_run.ino)
  *                                  (last-but-one menu row: "Update" over Wi-Fi)
  *
  * FIRST USB UPLOAD: Tools -> Partition Scheme ->
@@ -36,6 +37,7 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <WiFiManager.h>          // Library Manager: "WiFiManager" by tzapu
+#include <PubSubClient.h>         // Library Manager: "PubSubClient" by Nick O'Leary (Beep's phone link)
 #include "esp_sleep.h"
 #include "esp_random.h"
 #include "driver/gpio.h"
@@ -63,7 +65,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     6
+#define FW_VERSION     7
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network
@@ -226,6 +228,82 @@ const uint16_t STAR_COL[4] = {0x2945, 0x5AEB, 0x9CF3, 0xDEFB};
 #define MENU_HOLD_MS    800
 #define MENU_TIMEOUT_MS 20000UL
 
+// ================= BEEP (study buddy) =================
+// Phone link: the web page and the keychain meet on a public MQTT broker
+// under a private topic. Page -> keychain: settings (retained), hb, cmd.
+// Keychain -> page: status, report (retained).
+#define BEEP_TOPIC        "tiyabeep/q7Lm2xR9pK4w"
+#define BEEP_BROKER_1     "broker.emqx.io"
+#define BEEP_BROKER_2     "broker.hivemq.com"
+#define BEEP_BROKER_PORT  1883
+#define BEEP_WIFI_MS      10000     // give up joining Wi-Fi after this (runs offline)
+#define BEEP_SETTINGS_MS  1500      // wait this long for the page's saved settings
+#define BEEP_HB_WARN_MS   2200      // no "still here" from the page this long -> side-eye
+#define BEEP_ANGRY_MS     2300      // ...and this much longer -> angry, timer pauses
+#define BEEP_CALM_MS      1000      // phone back for this long -> calm down
+#define BEEP_GIVEUP_MS    600000UL  // angry this long (10 min) -> session ends (battery)
+#define BEEP_STATUS_MS    5000      // status to the page this often
+#define BEEP_LOOP_MS      30        // sensor + logic tick
+#define BEEP_ANIM_MS      80        // redraw rate for animated eyes (~12 fps)
+#define BEEP_RANDOM_MIN_S 45        // eyes change on their own every 45-90 s
+#define BEEP_RANDOM_MAX_S 90
+#define BEEP_WIGGLE_G     0.45f     // gentle shake: dynamic g per swing
+#define BEEP_WIGGLE_REVS  3         // swings needed (back-forth-back)
+#define BEEP_HARD_G       1.90f     // hard shake = dizzy; hard shake again while dizzy = quit
+#define BEEP_HARD_HITS    5
+
+// BEEP-SHARED-BEGIN (the preview renderer copies this block)
+#define BEEP_CHILL      0
+#define BEEP_CUTE       1
+#define BEEP_RABBIT     2
+#define BEEP_BLURRY     3
+#define BEEP_HYPNO      4
+#define BEEP_PIXEL      5
+#define BEEP_HEART      6
+#define BEEP_STAR       7
+#define BEEP_SLEEPY     8
+#define BEEP_HAPPY      9
+#define BEEP_SURPRISED  10
+#define BEEP_FOCUSED    11
+#define BEEP_ANGRY      12
+#define BEEP_SIDEEYE    13
+#define BEEP_DIZZY      14
+#define BEEP_CRY        15
+#define BEEP_SQUINT     16
+#define BEEP_NUM_STYLES 17
+
+#define BEEP_CV_W   168             // eye canvas: screen x 36..203, y 52..171
+#define BEEP_CV_H   120
+#define BEEP_CV_X   36
+#define BEEP_CV_Y   52
+#define BEEP_EYE_CY 56              // canvas y of the eye centres (screen y 108)
+#define BEEP_EYE_DX 42              // eye centre distance from the middle
+
+struct BeepFace {
+  uint8_t  style;
+  uint16_t color;      // the chosen eye colour
+  float    open;       // 1 = open, 0 = shut (blink)
+  int8_t   lookX;      // px offset of both eyes
+  int8_t   lookY;
+  uint8_t  anger;      // 1..3 for BEEP_ANGRY
+  uint32_t t;          // ms clock for animated styles
+};
+
+// purple (like the reel), cyan, pink, mint, orange, white
+const uint16_t BEEP_COLORS[] = {0xB21F, 0x07FF, 0xFA31, 0x3FF2, 0xFD20, 0xFFFF};
+const int BEEP_NUM_COLORS = sizeof(BEEP_COLORS) / sizeof(BEEP_COLORS[0]);
+void beepDrawFace(Adafruit_GFX& g, const BeepFace& f);
+// BEEP-SHARED-END
+
+struct BeepCfg {
+  uint16_t focusMin;
+  uint16_t breakMin;
+  uint8_t  rounds;
+  uint8_t  color;      // index into BEEP_COLORS
+  bool     check;      // phone check on/off
+  char     note[44];   // message shown at the start
+};
+
 // ---------------- Types ----------------
 struct ShakeResult {
   int peaks;
@@ -256,8 +334,9 @@ const int NUM_ANSWERS = sizeof(ANSWERS) / sizeof(ANSWERS[0]);
 
 // ---------------- Game list ----------------
 const GameEntry GAMES[] = {
-  {"Tilt runner", "bestRun"},
+  {"Beep",        "bestBeep"},   // study buddy, not a game: "best" = most focus rounds in one go
   {"Roulette",    "bestRoul"},
+  {"Tilt runner", "bestRun"},
   {"Snake",       "bestSnake"},
   {"Marble maze", "bestMaze"},
   {"Platformer",  "bestPlat"},
@@ -298,7 +377,7 @@ void configureWakeOnShake();
 void configureTiltMode();
 ShakeResult confirmShake();
 bool waitForStill(uint32_t timeoutMs);
-bool wantsGame(uint32_t windowMs);
+int  senseMode(uint32_t windowMs);   // 0 8-ball, 1 games, 2 Beep
 void calibrate();
 bool tiltBoth(float &up, float &right);
 float tiltUpDeg();
@@ -339,6 +418,8 @@ int playPlatform();
 int playRoulette();
 // ota
 void runUpdate();
+// beep
+int  runBeep();
 
 // =====================================================================
 //                              MAIN
@@ -357,6 +438,12 @@ void runGameFlow() {
       runUpdate();
       continue;
     }
+    if (sel == 0) {                         // "Beep": study session, then back to the menu
+      int rounds = runBeep();
+      if (rounds > (int)prefs.getUInt(GAMES[0].key, 0)) prefs.putUInt(GAMES[0].key, rounds);
+      configureTiltMode();
+      continue;
+    }
 
     // play the chosen game over and over until a shake sends us back
     while (true) {
@@ -364,11 +451,11 @@ void runGameFlow() {
       shakeReset();
       int score = 0;
       switch (sel) {
-        case 0: score = playRunner();   break;
         case 1: score = playRoulette(); break;
-        case 2: score = playSnake();    break;
-        case 3: score = playMaze();     break;
-        case 4: score = playPlatform(); break;
+        case 2: score = playRunner();   break;
+        case 3: score = playSnake();    break;
+        case 4: score = playMaze();     break;
+        case 5: score = playPlatform(); break;
       }
 
       bool newBest = score > best;
@@ -435,9 +522,13 @@ void setup() {
       displayOn();
       drawGreeting();
       configureTiltMode();
-      bool game = wantsGame(GREETING_MS);
-      if (game) runGameFlow();
-      else      runFortune();
+      int mode = senseMode(GREETING_MS);
+      if (mode == 1) runGameFlow();
+      else if (mode == 2) {                       // tipped RIGHT: Beep, the study buddy
+        int rounds = runBeep();
+        if (rounds > (int)prefs.getUInt(GAMES[0].key, 0)) prefs.putUInt(GAMES[0].key, rounds);
+      }
+      else runFortune();
       displaySleep();
     }
   } else if (coldBoot) {
