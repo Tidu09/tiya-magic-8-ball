@@ -8,7 +8,8 @@
 //  1. HELLO  happy eyes; joins the saved Wi-Fi (the one set up for Update)
 //            and the phone page's message relay, reads her settings.
 //  2. NOTE   shows the message typed on the page, if there is one.
-//  3. FOCUS  timer + eyes. If the page is linked and she leaves it or picks
+//  3. FOCUS  big clock in the middle (eyes peek out now and then, and for
+//            every reaction). If the page is linked and she leaves it or picks
 //            the phone up: side-eye, then ANGRY and the timer pauses.
 //            Each incident is a strike; strike 2 = red, strike 3+ = crash-out.
 //  4. BREAK  phone allowed; idle moods; sleepy in the last minute.
@@ -436,11 +437,10 @@ int runBeep() {
   uint32_t lastKey = 0xFFFFFFFF;
   char shownTimer[24] = "";
   uint16_t shownTimerCol = 1;
-  char shownHeader[24] = "";
-  uint16_t shownHeaderCol = 1;
-  int shownDots = -1;
-  uint16_t shownRingCol = 1;
-  bool noteShown = false;
+  int shownMode = -1;                     // centre: 0 eyes, 1 clock, 2 note
+  long shownSecs = -1;
+  uint16_t shownClockCol = 1;
+  uint32_t peekUntil = 0;                 // eyes shown over the clock until then
 
   auto event = [&](uint8_t st, uint32_t ms) { evStyle = st; evUntil = millis() + ms; };
 
@@ -465,10 +465,12 @@ int runBeep() {
     } else if (gesture == 1 && !angry) {                  // up-down wiggle
       ambient = BP_VERT[vi++ % sizeof(BP_VERT)];
       evStyle = 255;
+      peekUntil = now + 5000;
       nextRandom = now + 1000UL * BEEP_RANDOM_MAX_S;
     } else if (gesture == 2 && !angry) {                  // side-side wiggle
       ambient = BP_HORIZ[hi++ % sizeof(BP_HORIZ)];
       evStyle = 255;
+      peekUntil = now + 5000;
       nextRandom = now + 1000UL * BEEP_RANDOM_MAX_S;
     } else if (gesture == 4 && !angry && phase != BP_DONE) {
       event(BEEP_SQUINT, 2500);                           // laid flat: too bright!
@@ -508,7 +510,6 @@ int runBeep() {
         phaseStart = now;
         left = total = bp_cfg.focusMin * 60000L;
         ambient = BEEP_FOCUSED;
-        noteShown = false;
         lastKey = 0xFFFFFFFF;
         statusDirty = true;
       }
@@ -621,7 +622,10 @@ int runBeep() {
       uint8_t pick;
       do { pick = pool[esp_random() % sizeof(pool)]; } while (pick == ambient);
       ambient = pick;
-      nextRandom = now + 1000UL * (BEEP_RANDOM_MIN_S + esp_random() % (BEEP_RANDOM_MAX_S - BEEP_RANDOM_MIN_S));
+      peekUntil = now + 5000;                             // Beep peeks out over the clock
+      uint32_t lo = BEEP_RANDOM_MIN_S, hi2 = BEEP_RANDOM_MAX_S;
+      if (phase == BP_BREAK) { lo = 20; hi2 = 40; }       // more company during breaks
+      nextRandom = now + 1000UL * (lo + esp_random() % (hi2 - lo));
     }
     uint8_t style;
     if (phase == BP_DONE)                         style = doneStyle;
@@ -665,36 +669,51 @@ int runBeep() {
     f.lookY = (int8_t)lroundf(lookYf);
 
     // ---------------- draw ----------------
-    // header
-    char hdr[24];
-    uint16_t hcol = C_DIMTEXT;
-    if (phase == BP_HELLO)      strcpy(hdr, "HI TIYA!");
-    else if (phase == BP_NOTE)  strcpy(hdr, "A NOTE");
-    else if (phase == BP_DONE)  strcpy(hdr, quitEarly ? "BYE..." : gaveUp ? "ZZZ..." : "DONE!");
-    else if (angry)             { strcpy(hdr, "PAUSED"); hcol = BP_RED; }
-    else if (warn)              strcpy(hdr, "HMM...");
-    else snprintf(hdr, sizeof(hdr), "%s %d/%d", phase == BP_FOCUS ? "FOCUS" : "BREAK",
-                  round, bp_cfg.rounds);
-    if (strcmp(hdr, shownHeader) || hcol != shownHeaderCol) {
-      beepHeader(tft, hdr, hcol);
-      strcpy(shownHeader, hdr);
-      shownHeaderCol = hcol;
-    }
+    // Centre: the clock during focus / break; eyes for everything else, for
+    // reactions (angry, side-eye, dizzy, squint, hearts...), after a wiggle,
+    // and when Beep peeks out every so often.
+    bool timerPhase = (phase == BP_FOCUS || phase == BP_BREAK);
+    bool eyesNow = !timerPhase || angry || warn || (evStyle != 255 && now < evUntil) || now < peekUntil;
+    int mode = (phase == BP_NOTE) ? 2 : eyesNow ? 0 : 1;
+    uint16_t phaseCol = (phase == BP_BREAK) ? BP_MINT : f.color;
 
-    // timer / short status text
+    if (mode == 2) {
+      if (shownMode != 2) { bp_drawNote(*bp_cv, bp_cfg.note); bp_pushEyes(); }
+    } else if (mode == 1) {
+      long secs = (left + 999) / 1000;
+      if (secs < 0) secs = 0;
+      if (shownMode != 1 || secs != shownSecs || phaseCol != shownClockCol) {
+        beepDrawClock(*bp_cv, secs, phaseCol);
+        bp_pushEyes();
+        shownSecs = secs;
+        shownClockCol = phaseCol;
+      }
+    } else {
+      bool animated = style == BEEP_BLURRY || style == BEEP_HYPNO || style == BEEP_HEART ||
+                      style == BEEP_STAR || style == BEEP_SLEEPY || style == BEEP_DIZZY ||
+                      style == BEEP_CRY || (style == BEEP_ANGRY && f.anger >= 2);
+      uint32_t key = ((uint32_t)style << 24) ^ ((uint32_t)(f.open * 15) << 20) ^
+                     ((uint32_t)(uint8_t)f.lookX << 12) ^ ((uint32_t)(uint8_t)f.lookY << 4) ^
+                     f.anger ^ ((uint32_t)f.color << 8);
+      if (shownMode != 0 || key != lastKey || (animated && now - lastRender >= BEEP_ANIM_MS)) {
+        beepDrawFace(*bp_cv, f);
+        bp_pushEyes();
+        lastKey = key;
+        lastRender = now;
+      }
+    }
+    shownMode = mode;
+
+    // Under the centre: round dots while studying, a few words otherwise
     char tm[24];
-    uint16_t tcol = f.color;
-    if (phase == BP_FOCUS || phase == BP_BREAK) {
-      long s = (left + 999) / 1000;
-      if (s < 0) s = 0;
-      snprintf(tm, sizeof(tm), "%ld:%02ld", s / 60, s % 60);
-      if (phase == BP_BREAK) tcol = BP_MINT;
-      if (angry) tcol = ((now / 500) & 1) ? BP_RED : BP_DIM;
+    uint16_t tcol = C_WHITE;
+    if (timerPhase) {
+      snprintf(tm, sizeof(tm), "#%d/%d/%d", done, round, bp_cfg.rounds);   // cache key only
+      tcol = phaseCol;
     } else if (phase == BP_HELLO) {
       strcpy(tm, online ? (bp_gotSettings ? "linked!" : "linked") :
                  bp_wifiEverOk ? "connecting" :
-                 now - phaseStart > 4000 ? "finding Wi-Fi" : "waking up");
-      tcol = C_WHITE;
+                 now - phaseStart > 4000 ? "finding Wi-Fi" : "hi Tiya!");
     } else if (phase == BP_NOTE) {
       strcpy(tm, "");
     } else {
@@ -704,52 +723,11 @@ int runBeep() {
       tcol = quitEarly ? BE_BLUE : C_WHITE;
     }
     if (strcmp(tm, shownTimer) || tcol != shownTimerCol) {
-      beepDrawTimer(*bp_tv, tm, tcol);
+      if (timerPhase) beepDrawRounds(*bp_tv, done, round, bp_cfg.rounds, tcol);
+      else            beepDrawTimer(*bp_tv, tm, tcol);
       bp_pushTimer();
       strcpy(shownTimer, tm);
       shownTimerCol = tcol;
-    }
-
-    // progress ring
-    int dots = BEEP_RING_N;
-    uint16_t rcol = (phase == BP_BREAK) ? BP_MINT : f.color;
-    if (phase == BP_FOCUS || phase == BP_BREAK) {
-      dots = (int)(((int64_t)(left > 0 ? left : 0) * BEEP_RING_N + total - 1) / total);
-    } else if (phase == BP_HELLO || phase == BP_NOTE) {
-      rcol = BP_DIM;
-    }
-    if (angry && strikes >= 3) rcol = ((now / 300) & 1) ? BP_RED : BP_DIM;
-    else if (angry) rcol = BP_RED;
-    if (rcol != shownRingCol) shownDots = -1;
-    if (dots != shownDots) {
-      for (int i = 0; i < BEEP_RING_N; i++) {
-        bool on = i < dots, was = i < shownDots;
-        if (shownDots < 0 || on != was) beepRingDot(tft, i, on ? rcol : BP_DIM);
-      }
-      shownDots = dots;
-      shownRingCol = rcol;
-    }
-
-    // eyes (or the note)
-    if (phase == BP_NOTE) {
-      if (!noteShown) {
-        bp_drawNote(*bp_cv, bp_cfg.note);
-        bp_pushEyes();
-        noteShown = true;
-      }
-    } else {
-      bool animated = style == BEEP_BLURRY || style == BEEP_HYPNO || style == BEEP_HEART ||
-                      style == BEEP_STAR || style == BEEP_SLEEPY || style == BEEP_DIZZY ||
-                      style == BEEP_CRY || (style == BEEP_ANGRY && f.anger >= 2);
-      uint32_t key = ((uint32_t)style << 24) ^ ((uint32_t)(f.open * 15) << 20) ^
-                     ((uint32_t)(uint8_t)f.lookX << 12) ^ ((uint32_t)(uint8_t)f.lookY << 4) ^
-                     f.anger ^ ((uint32_t)f.color << 8);
-      if (key != lastKey || (animated && now - lastRender >= BEEP_ANIM_MS)) {
-        beepDrawFace(*bp_cv, f);
-        bp_pushEyes();
-        lastKey = key;
-        lastRender = now;
-      }
     }
 
     uint32_t spent = millis() - now;

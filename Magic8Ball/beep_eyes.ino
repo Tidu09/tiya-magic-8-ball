@@ -285,12 +285,10 @@ void beepDrawFace(Adafruit_GFX& g, const BeepFace& f) {
 }
 
 // ---------------- screen furniture (also used by the previews) ----------------
-#define BEEP_TM_W   120             // timer canvas: screen x 60..179, y 176..209
-#define BEEP_TM_H   34
+#define BEEP_TM_W   120             // small canvas under the centre: screen x 60..179, y 186..215
+#define BEEP_TM_H   30
 #define BEEP_TM_X   60
-#define BEEP_TM_Y   176
-#define BEEP_RING_R 112             // progress dots around the rim
-#define BEEP_RING_N 60
+#define BEEP_TM_Y   186
 
 static void be_text(Adafruit_GFX& g, const char* s, int cx, int cy, const GFXfont* f, uint16_t c) {
   g.setFont(f);
@@ -303,19 +301,77 @@ static void be_text(Adafruit_GFX& g, const char* s, int cx, int cy, const GFXfon
   g.print(s);
 }
 
-// Timer canvas: big digits, or a short word in a smaller font
+// ---- seven-segment clock, like a little LCD: unlit segments glow faintly ----
+#define BE_SEG_W   32
+#define BE_SEG_T   7
+#define BE_SEG_V   20                // vertical segment length
+#define BE_SEG_H   (3 * BE_SEG_T + 2 * BE_SEG_V)
+#define BE_SEG_GAP 8
+#define BE_COLON_W 16
+
+static const uint8_t BE_DIGIT[10] = {   // bits: a b c d e f g
+  0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
+};
+
+static void be_seg(Adafruit_GFX& g, int x, int y, int seg, uint16_t c) {
+  const int t = BE_SEG_T, v = BE_SEG_V, w = BE_SEG_W;
+  switch (seg) {
+    case 0: g.fillRoundRect(x + t - 1, y,                 w - 2 * t + 2, t, 3, c); break;  // a
+    case 1: g.fillRoundRect(x + w - t, y + t - 1,         t, v + 2, 3, c); break;          // b
+    case 2: g.fillRoundRect(x + w - t, y + 2 * t + v - 1, t, v + 2, 3, c); break;          // c
+    case 3: g.fillRoundRect(x + t - 1, y + 2 * t + 2 * v, w - 2 * t + 2, t, 3, c); break;  // d
+    case 4: g.fillRoundRect(x,         y + 2 * t + v - 1, t, v + 2, 3, c); break;          // e
+    case 5: g.fillRoundRect(x,         y + t - 1,         t, v + 2, 3, c); break;          // f
+    case 6: g.fillRoundRect(x + t - 1, y + t + v,         w - 2 * t + 2, t, 3, c); break;  // g
+  }
+}
+
+static void be_digit(Adafruit_GFX& g, int x, int y, int d, uint16_t on, uint16_t ghost) {
+  for (int s = 0; s < 7; s++) be_seg(g, x, y, s, (BE_DIGIT[d] >> s) & 1 ? on : ghost);
+}
+
+// Whole canvas: m:ss (or mm:ss) in the middle
+void beepDrawClock(Adafruit_GFX& g, long secs, uint16_t c) {
+  g.fillScreen(BE_BG);
+  if (secs < 0) secs = 0;
+  int m = secs / 60, s = secs % 60;
+  if (m > 99) m = 99;
+  int digits[4], n = 0;
+  if (m >= 10) digits[n++] = m / 10;
+  digits[n++] = m % 10;
+  digits[n++] = s / 10;
+  digits[n++] = s % 10;
+  int width = n * BE_SEG_W + (n - 2) * BE_SEG_GAP + BE_COLON_W;
+  int x = (BEEP_CV_W - width) / 2;
+  int y = (BEEP_CV_H - BE_SEG_H) / 2;
+  uint16_t ghost = be_blend(BE_BG, c, 0.07f);
+  for (int i = 0; i < n; i++) {
+    if (i == n - 2) {                                   // the colon
+      int cx = x + BE_COLON_W / 2 - 1;
+      g.fillCircle(cx, y + BE_SEG_H / 3, 4, c);
+      g.fillCircle(cx, y + 2 * BE_SEG_H / 3, 4, c);
+      x += BE_COLON_W;
+    }
+    be_digit(g, x, y, digits[i], c, ghost);
+    x += BE_SEG_W + (i < n - 1 && i != n - 3 ? BE_SEG_GAP : 0);
+  }
+}
+
+// Small canvas: one dot per round (done = filled, current = ring, later = dim)
+void beepDrawRounds(Adafruit_GFX& g, int done, int current, int of, uint16_t c) {
+  g.fillScreen(BE_BG);
+  const int sp = 15;
+  int x0 = BEEP_TM_W / 2 - (of - 1) * sp / 2;
+  for (int i = 0; i < of; i++) {
+    int x = x0 + i * sp, y = BEEP_TM_H / 2;
+    if (i < done)             g.fillCircle(x, y, 4, c);
+    else if (i == current - 1) { g.drawCircle(x, y, 4, c); g.drawCircle(x, y, 3, c); }
+    else                      g.drawCircle(x, y, 3, be_blend(BE_BG, c, 0.35f));
+  }
+}
+
+// Small canvas: a short line of text
 void beepDrawTimer(Adafruit_GFX& g, const char* s, uint16_t c) {
   g.fillScreen(BE_BG);
-  bool digits = strlen(s) <= 5 && strchr(s, ':') != NULL;
-  be_text(g, s, BEEP_TM_W / 2, BEEP_TM_H / 2, digits ? &FreeSansBold18pt7b : &FreeSans9pt7b, c);
-}
-
-void beepRingDot(Adafruit_GFX& g, int i, uint16_t c) {
-  float a = i * BE_TAU / BEEP_RING_N - 1.5708f;
-  g.fillCircle(120 + (int)(BEEP_RING_R * cosf(a)), 120 + (int)(BEEP_RING_R * sinf(a)), 2, c);
-}
-
-void beepHeader(Adafruit_GFX& g, const char* s, uint16_t c) {
-  g.fillRect(62, 20, 116, 24, BE_BG);
-  be_text(g, s, 120, 32, &FreeSans9pt7b, c);
+  be_text(g, s, BEEP_TM_W / 2, BEEP_TM_H / 2, &FreeSans9pt7b, c);
 }

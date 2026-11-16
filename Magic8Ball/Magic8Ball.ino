@@ -65,7 +65,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     7
+#define FW_VERSION     8
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network
@@ -272,11 +272,11 @@ const uint16_t STAR_COL[4] = {0x2945, 0x5AEB, 0x9CF3, 0xDEFB};
 #define BEEP_SQUINT     16
 #define BEEP_NUM_STYLES 17
 
-#define BEEP_CV_W   168             // eye canvas: screen x 36..203, y 52..171
+#define BEEP_CV_W   168             // centre canvas (eyes or clock): screen x 36..203, y 60..179
 #define BEEP_CV_H   120
 #define BEEP_CV_X   36
-#define BEEP_CV_Y   52
-#define BEEP_EYE_CY 56              // canvas y of the eye centres (screen y 108)
+#define BEEP_CV_Y   60
+#define BEEP_EYE_CY 60              // canvas y of the eye centres (screen centre)
 #define BEEP_EYE_DX 42              // eye centre distance from the middle
 
 struct BeepFace {
@@ -293,6 +293,8 @@ struct BeepFace {
 const uint16_t BEEP_COLORS[] = {0xB21F, 0x07FF, 0xFA31, 0x3FF2, 0xFD20, 0xFFFF};
 const int BEEP_NUM_COLORS = sizeof(BEEP_COLORS) / sizeof(BEEP_COLORS[0]);
 void beepDrawFace(Adafruit_GFX& g, const BeepFace& f);
+void beepDrawClock(Adafruit_GFX& g, long secs, uint16_t c);
+void beepDrawRounds(Adafruit_GFX& g, int done, int current, int of, uint16_t c);
 // BEEP-SHARED-END
 
 struct BeepCfg {

@@ -98,9 +98,12 @@ in `docs/` (GitHub Pages: https://tidu09.github.io/tiya-magic-8-ball/).
   the last saved settings and no phone check.
 - During focus, once the page has linked: no "1" heartbeat for 2.2 s ->
   side-eye; 2.3 s more -> angry, timer paused, strike +1. Strike 2 = red eyes,
-  strike 3+ = shaking crash-out. Angry for 10 min -> session ends (battery).
+  strike 3+ = shaking crash-out (no text: the eyes say it). Angry for 10 min -> session ends (battery).
 - Gestures: up-down wiggle = cute eyes, side-side wiggle = trippy eyes, hard
   shake = dizzy (again while dizzy = quit), laid flat = squint.
+- Screen: big seven-segment clock in the middle during focus/break, round dots
+  underneath; eyes take over for reactions, wiggles and a random peek (45-90 s,
+  20-40 s on breaks). No rim ring, no header text.
 - Power: Wi-Fi max modem sleep, 8.5 dBm, static eyes redraw only on change,
   animated ones at ~12 fps, radio off at the end.
 - Previews: the eye code is pure Adafruit_GFX, so it can be compiled on a PC
