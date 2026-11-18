@@ -24,6 +24,17 @@ Rules that keep this working: constants and globals live only in the main tab,
 every cross-tab function has a forward declaration there, and structs are
 defined before anything uses them.
 
+Input rules for every game (Coin flip broke in v11-v12 by ignoring these):
+- Each frame, call `tiltBoth()` first: it feeds the shake-to-quit detector. Then
+  check `shakeSeen()`.
+- A game that needs a flick/jerk gets its OWN detector in its own tab (like
+  `pfJump()` in the platformer, `coinFlick()` in coin flip), with its own
+  `XX_FLICK_G` / `_REARM` / `_GAP` constants.
+- Never call `menuFlick()` inside a game. It is for the menu only: it calls
+  `shakeReset()` on every jerk, so a shake looks like a string of flicks and
+  never reaches the 6 hits needed to quit. A gesture detector must never touch
+  the shake counter.
+
 ## Over-the-air updates
 
 The menu's **Update** row (just above Sleep) connects to Wi-Fi and installs a
@@ -58,7 +69,8 @@ newer version from GitHub (`Tidu09/tiya-magic-8-ball`, folder `firmware/`).
   the number (spin again as often as you like). The bets RED, BLACK, ODD, EVEN,
   1-18, 19-36: a win spins again; score = wins in a row. 0 loses every bet.
   Hold sideways to spin. Finish feel: `ROU_FRET_HILL` / `ROU_POCK_DAMP`.
-- **Coin flip** (3rd in the menu): flick up a little = toss, as often as you like.
+- **Coin flip** (3rd in the menu): flick up a little = toss, as often as you like,
+  even mid-spin (own soft detector `coinFlick`, tune `COIN_FLICK_G`).
   No score, no text (crown = heads, star = tails). Shake = back to the menu.
   The menu now shows 4 rows at a time and scrolls (arrows show there is more).
 

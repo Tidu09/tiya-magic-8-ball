@@ -2,6 +2,7 @@
 //  game_coin.ino — coin flip (3rd in the menu)
 //
 //  Flick UP  : toss the coin, any time, even while it is still spinning
+//              (own soft detector, coinFlick: tune with COIN_FLICK_G)
 //  Shake     : back to the menu
 //  No modes, no score, no text. 60 s with no flick = back to the menu.
 //
@@ -25,6 +26,9 @@
 #define COIN_FLIP_MS    1500     // toss time (+ up to 400 ms random)
 #define COIN_SETTLE_MS  480      // wobble after landing
 #define COIN_IDLE_MS    60000UL  // no flick for this long = back to the menu
+#define COIN_FLICK_G     0.28f   // up-jerk this hard (g off rest) to toss. LOWER = more sensitive
+#define COIN_FLICK_REARM 0.14f   // must settle back under this before the next toss
+#define COIN_FLICK_GAP   110     // ms lockout after a toss, swallows the rebound
 
 #define COIN_C_RIM      0x9362   // dark gold
 #define COIN_C_FACE     0xF5E6   // gold
@@ -143,6 +147,34 @@ static void coinPush(GFXcanvas16* cv) {
   tft.drawRGBBitmap(COIN_CX - COIN_CV / 2, COIN_CY - COIN_CV / 2, cv->getBuffer(), COIN_CV, COIN_CV);
 }
 
+// ------------------------------------------------------------ flick gesture
+// Own detector, like the platformer's jump (pfJump). It never touches the
+// shake counter, so a shake always gets through. Do NOT use menuFlick() in
+// a game: it resets the shake counter on every jerk, which swallows shakes.
+static bool coinFlick() {
+  static bool armed = true;
+  static uint32_t lastFlick = 0;
+  float a[3];
+  if (!readAccelG(a)) return false;
+
+  float du = (a[SCREEN_UP_AXIS] - refVec[SCREEN_UP_AXIS]) * SCREEN_UP_SIGN;
+  if (armed && du > COIN_FLICK_G && millis() - lastFlick > COIN_FLICK_GAP) {
+    armed = false;
+    lastFlick = millis();
+    return true;
+  }
+  if (fabsf(du) < COIN_FLICK_REARM) armed = true;
+  return false;
+}
+
+// One frame of input, the same as every other game: tiltBoth() feeds the
+// shake-to-quit detector, then the game's own gesture detector.
+static bool coinInput() {
+  float up, right;
+  tiltBoth(up, right);
+  return coinFlick();
+}
+
 // ---------------------------------------------------------------- the toss
 // Tosses from `face` lying flat. A flick at ANY moment (mid-air or while it
 // wobbles) tosses it again from wherever it is, so it never feels stuck.
@@ -168,7 +200,7 @@ static int coinToss(GFXcanvas16* cv, uint8_t face) {
       scale = 1.0f + COIN_LIFT * sinf(PI * u) + (s0 - 1.0f) * (1.0f - u);
       coinDrawFrame(*cv, theta, scale, face);
       coinPush(cv);
-      if (menuFlick()) { again = true; break; }    // flicked mid-air: toss again
+      if (coinInput()) { again = true; break; }    // flicked mid-air: toss again
       if (shakeSeen()) return -1;
     }
     if (again) continue;
@@ -183,7 +215,7 @@ static int coinToss(GFXcanvas16* cv, uint8_t face) {
       theta = th1 + amp * expf(-t / 130.0f) * sinf(2.0f * PI * t / 170.0f);
       coinDrawFrame(*cv, theta, 1.0f, face);
       coinPush(cv);
-      if (menuFlick()) { again = true; break; }
+      if (coinInput()) { again = true; break; }
       if (shakeSeen()) return -1;
     }
     if (again) continue;
@@ -215,7 +247,7 @@ void playCoin() {
   shakeReset();
   uint32_t lastAct = millis();
   while (true) {
-    if (menuFlick()) {                         // a little flick up = toss
+    if (coinInput()) {                         // a little flick up = toss
       int res = coinToss(cv, face);
       if (res < 0) break;                      // shaken mid-toss
       face = (uint8_t)res;
