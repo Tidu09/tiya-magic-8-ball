@@ -63,9 +63,21 @@
 #define DEBUG_USB  1
 
 // ---------------- Firmware version + over-the-air update ----------------
-// Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
-// workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     14
+// Semantic version MAJOR.MINOR.PATCH. To ship an update, bump one of these
+// and push to GitHub: the repo's Actions workflow compiles it and publishes
+// firmware/ only when the version goes up.
+//   PATCH: fixes and tuning   MINOR: new features / games   MAJOR: big changes
+// MINOR and PATCH must stay below 100. History: builds 1-14 were whole
+// numbers; build 14 = 1.0.0.
+#define FW_MAJOR       1
+#define FW_MINOR       0
+#define FW_PATCH       1
+// Whole number used to compare versions over the air (1.0.1 -> 10001). Older
+// keychains (build 14 and earlier) compare whole numbers, so this stays a number.
+#define FW_VERSION     (FW_MAJOR * 10000 + FW_MINOR * 100 + FW_PATCH)
+#define FW_XSTR(x)     #x
+#define FW_STR_(a, b, c) FW_XSTR(a) "." FW_XSTR(b) "." FW_XSTR(c)
+#define FW_STR         FW_STR_(FW_MAJOR, FW_MINOR, FW_PATCH)   // "1.0.1"
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network
@@ -547,13 +559,13 @@ void setup() {
         (why == ESP_RST_PANIC)    ? "crashed" :
         (why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT || why == ESP_RST_WDT) ? "watchdog" :
         (why == ESP_RST_SW)       ? "restarted" : NULL;
-    if (DEBUG_USB) Serial.printf("Cold boot: firmware v%d, reset reason %d (%s)\n",
-                                 FW_VERSION, (int)why, whyTxt ? whyTxt : "power on");
+    if (DEBUG_USB) Serial.printf("Cold boot: firmware v%s, reset reason %d (%s)\n",
+                                 FW_STR, (int)why, whyTxt ? whyTxt : "power on");
     displayOn();
     drawEightBall();
     char ver[32];
-    if (whyTxt) snprintf(ver, sizeof(ver), "v%d  %s", FW_VERSION, whyTxt);
-    else        snprintf(ver, sizeof(ver), "v%d", FW_VERSION);
+    if (whyTxt) snprintf(ver, sizeof(ver), "v%s  %s", FW_STR, whyTxt);
+    else        snprintf(ver, sizeof(ver), "v%s", FW_STR);
     drawCentered(ver, 222, &FreeSans9pt7b, 1,
                  (whyTxt && why != ESP_RST_SW) ? C_DANGER : C_RINGDIM);
     delay(whyTxt ? 4000 : EIGHTBALL_MS);           // linger if something odd happened

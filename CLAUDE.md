@@ -8,5 +8,9 @@
 - Unsigned time maths: write `-(float)t`, never `-t`, when `t` comes from
   `millis()`. That bug froze Coin flip (v10-v13). Float drawing loops must
   check `isfinite` and clamp to the canvas.
-- Ship an update: bump `FW_VERSION` in `Magic8Ball/Magic8Ball.ino`, push to
+- Versions are semantic: bump `FW_MAJOR` / `FW_MINOR` / `FW_PATCH` in
+  `Magic8Ball/Magic8Ball.ino` (PATCH = fix/tuning, MINOR = feature/game,
+  MAJOR = big change). Never edit `FW_VERSION` itself: it is derived, and it
+  must stay a whole number so older keychains can still update.
+- Ship an update: bump the version as above, push to
   `main`, wait for the Build firmware workflow to publish `firmware/`.

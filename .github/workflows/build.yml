@@ -53,7 +53,13 @@ jobs:
 
       - name: Publish if FW_VERSION went up
         run: |
-          VER=$(grep -oP '^#define FW_VERSION\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          # Semantic version from FW_MAJOR/MINOR/PATCH; VER is the whole number
+          # the keychains compare (MAJOR*10000 + MINOR*100 + PATCH).
+          MAJ=$(grep -oP '^#define FW_MAJOR\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          MIN=$(grep -oP '^#define FW_MINOR\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          PAT=$(grep -oP '^#define FW_PATCH\s+\K[0-9]+' Magic8Ball/Magic8Ball.ino)
+          VER=$((MAJ * 10000 + MIN * 100 + PAT))
+          VSTR="$MAJ.$MIN.$PAT"
           SIZE=$(stat -c %s build/Magic8Ball.ino.bin)
           # Compare with what is published NOW (an earlier run may have just
           # published), and commit on top of the latest main.
@@ -61,7 +67,7 @@ jobs:
           git checkout -q -B publish origin/main
           PUB=0
           [ -f firmware/version.txt ] && PUB=$(cut -d' ' -f1 firmware/version.txt)
-          echo "Source FW_VERSION=$VER, published=$PUB, binary=$SIZE bytes"
+          echo "Source v$VSTR ($VER), published=$PUB, binary=$SIZE bytes"
           if [ "$VER" -le "$PUB" ]; then
             echo "Not newer than the published version: compile check only."
             exit 0
@@ -70,14 +76,14 @@ jobs:
           # fw-<N>.bin: a new file name per version, so no CDN can serve a
           # stale binary. firmware.bin is kept for keychains on v5 or older.
           git rm -q --ignore-unmatch firmware/fw-*.bin
-          cp build/Magic8Ball.ino.bin "firmware/fw-$VER.bin"
+          cp build/Magic8Ball.ino.bin "firmware/fw-$VSTR.bin"
           cp build/Magic8Ball.ino.bin firmware/firmware.bin
           MD5=$(md5sum firmware/firmware.bin | cut -d' ' -f1)
-          echo "$VER $MD5 $SIZE fw-$VER.bin" > firmware/version.txt
+          echo "$VER $MD5 $SIZE fw-$VSTR.bin" > firmware/version.txt
           git config user.name  "firmware-bot"
           git config user.email "firmware-bot@users.noreply.github.com"
           git add firmware/
-          git commit -m "Publish firmware v$VER ($SIZE bytes)"
+          git commit -m "Publish firmware v$VSTR ($SIZE bytes)"
           git push origin publish:main
 
       - name: Refresh the jsDelivr mirror

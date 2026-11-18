@@ -551,9 +551,9 @@ int runBeep() {
       char st[200];
       snprintf(st, sizeof(st),
                "{\"ph\":\"%s\",\"left\":%ld,\"tot\":%ld,\"r\":%d,\"of\":%d,\"done\":%d,"
-               "\"strikes\":%d,\"angry\":%d,\"warn\":%d,\"mood\":\"%s\",\"link\":%d,\"fw\":%d}",
+               "\"strikes\":%d,\"angry\":%d,\"warn\":%d,\"mood\":\"%s\",\"link\":%d,\"fw\":\"%s\"}",
                PH[phase], (long)(left > 0 ? left / 1000 : 0), (long)(total / 1000), round,
-               bp_cfg.rounds, done, strikes, angry, warn, BP_MOOD[f.style], bp_linked, FW_VERSION);
+               bp_cfg.rounds, done, strikes, angry, warn, BP_MOOD[f.style], bp_linked, FW_STR);
       bp_pubTopic("status", st, false);
       lastStatus = now;
     }

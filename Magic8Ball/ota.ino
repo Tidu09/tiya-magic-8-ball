@@ -6,6 +6,7 @@
 //       the keychain opens its own hotspot (OTA_AP_NAME). Join it from a
 //       phone, a page pops up, pick the home Wi-Fi + password. Saved.
 //    2. Downloads version.txt  ("<version> <md5> <size> [<file>]") from
+//       (<version> is the whole number FW_VERSION, e.g. 10001 for 1.0.1)
 //       GitHub, or from the jsDelivr mirror if GitHub can't be reached.
 //    3. Newer than FW_VERSION?  Download the firmware with a progress ring,
 //       check its MD5, switch to it and restart.
@@ -14,7 +15,8 @@
 //  The current firmware always keeps running after a failed attempt.
 //  Wi-Fi is switched fully off afterwards.
 //
-//  Publishing a new version: bump FW_VERSION in Magic8Ball.ino and push to
+//  Publishing a new version: bump FW_MAJOR / FW_MINOR / FW_PATCH in
+//  Magic8Ball.ino and push to
 //  GitHub. The repo's Actions workflow compiles it and updates /firmware.
 // =====================================================================
 
@@ -143,6 +145,12 @@ static int otaInternetCheck() {
   return (code > 0) ? 1 : 2;
 }
 
+// Whole-number version -> "1.0.1" (builds 1-14 were plain numbers: "v14")
+static void otaVerStr(int v, char* out, size_t n) {
+  if (v >= 10000) snprintf(out, n, "%d.%d.%d", v / 10000, (v / 100) % 100, v % 100);
+  else            snprintf(out, n, "%d", v);
+}
+
 // ---------------- version.txt ----------------
 static bool otaFetchInfo(const char* base, int &ver, char* md5, int &size, char* file) {
   char host[40];
@@ -177,8 +185,8 @@ static bool otaFetchInfo(const char* base, int &ver, char* md5, int &size, char*
       md5[0] = 0;
       strcpy(file, "firmware.bin");
       int got = sscanf(body.c_str(), "%d %32s %d %31s", &ver, md5, &size, file);
-      if (DEBUG_USB) Serial.printf("OTA: %s says v%d %s (%d bytes), running v%d\n",
-                                   host, ver, file, size, FW_VERSION);
+      if (DEBUG_USB) Serial.printf("OTA: %s says %d %s (%d bytes), running %d (v%s)\n",
+                                   host, ver, file, size, FW_VERSION, FW_STR);
       if (got >= 3 && strlen(md5) == 32 && size > 0) return true;
       snprintf(otaErr, sizeof(otaErr), "bad version.txt");
       return false;
@@ -287,7 +295,7 @@ static bool otaOfferWifiChange(const char* title, const char* why) {
 
 // =====================================================================
 void runUpdate() {
-  if (DEBUG_USB) Serial.printf("OTA: running v%d\n", FW_VERSION);
+  if (DEBUG_USB) Serial.printf("OTA: running v%s\n", FW_STR);
   setCpuFrequencyMhz(160);                          // faster HTTPS, steadier Wi-Fi
   shakeReset();
   bool forceSetup = false;
@@ -323,13 +331,15 @@ void runUpdate() {
     char line[32];
     if (ver <= FW_VERSION) {
       otaWifiOff();
-      snprintf(line, sizeof(line), "version %d", FW_VERSION);
+      snprintf(line, sizeof(line), "version %s", FW_STR);
       otaScreen("Up to date", line, NULL, C_GAME);
       otaHold(2500);
       break;
     }
 
-    snprintf(line, sizeof(line), "v%d -> v%d", FW_VERSION, ver);
+    char newVer[16];
+    otaVerStr(ver, newVer, sizeof(newVer));
+    snprintf(line, sizeof(line), "v%s -> v%s", FW_STR, newVer);
     otaScreen("New version!", line, "don't shake me", C_YELLOW);
     otaRing(-1);
     otaRing(0);

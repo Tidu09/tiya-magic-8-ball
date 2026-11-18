@@ -26,8 +26,8 @@
 #define COIN_FLIP_MS    1500     // toss time (+ up to 400 ms random)
 #define COIN_SETTLE_MS  480      // wobble after landing
 #define COIN_IDLE_MS    60000UL  // no flick for this long = back to the menu
-#define COIN_FLICK_G     0.28f   // up-jerk this hard (g off rest) to toss. LOWER = more sensitive
-#define COIN_FLICK_REARM 0.14f   // must settle back under this before the next toss
+#define COIN_FLICK_G     0.23f   // up-jerk this hard (g off rest) to toss. LOWER = more sensitive
+#define COIN_FLICK_REARM 0.12f   // must settle back under this before the next toss
 #define COIN_FLICK_GAP   110     // ms lockout after a toss, swallows the rebound
 
 #define COIN_C_RIM      0x9362   // dark gold

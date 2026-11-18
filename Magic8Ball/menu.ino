@@ -40,7 +40,7 @@ static void drawMenuList(int sel) {
     } else if (isUpdate) {
       drawCentered("Update", y - 3, &FreeSans9pt7b, 1, on ? C_WHITE : C_DIMTEXT);
       char b[20];
-      snprintf(b, sizeof(b), "version %d", FW_VERSION);
+      snprintf(b, sizeof(b), "version %s", FW_STR);
       tft.setFont(NULL);
       tft.setTextSize(1);
       tft.setTextColor(on ? C_GAME : C_RINGDIM);

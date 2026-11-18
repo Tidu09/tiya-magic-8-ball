@@ -54,7 +54,12 @@ newer version from GitHub (`Tidu09/tiya-magic-8-ball`, folder `firmware/`).
   192.168.4.1); pick the home Wi-Fi and type its password. It is remembered.
 - Up to date -> "Up to date". Newer -> progress ring, MD5 check, restart.
   A failed or cancelled download keeps the current version. Shake cancels.
-- Shipping an update: bump `FW_VERSION` in `Magic8Ball.ino`, push to `main`.
+- Versions: semantic version `FW_MAJOR.FW_MINOR.FW_PATCH`
+  in `Magic8Ball.ino` (PATCH = fix/tuning, MINOR = new feature/game,
+  MAJOR = big change; MINOR and PATCH stay below 100).
+  Builds 1-14 used whole numbers; build 14 = 1.0.0. The screens show `1.0.1`;
+  the update check compares `FW_VERSION` = MAJOR*10000 + MINOR*100 + PATCH.
+- Shipping an update: bump the version in `Magic8Ball.ino`, push to `main`.
   The GitHub Actions workflow compiles for the ESP32-C3 and, if the number
   went up, publishes `firmware/firmware.bin` + `firmware/version.txt`.
 - One-time USB setup: Partition Scheme "Minimal SPIFFS (1.9MB APP with OTA)",
