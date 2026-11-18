@@ -41,12 +41,17 @@
 static float coinCx, coinCy, coinU, coinSy;
 
 static void coinEllipse(Adafruit_GFX& g, float cx, float cy, float rx, float ry, uint16_t c) {
+  // Guard: a NaN/inf here turns into a ~4-billion-row loop on the ESP32-C3
+  // (float->int of NaN gives INT_MAX), which looks exactly like a frozen screen.
+  if (!isfinite(cx) || !isfinite(cy) || !isfinite(rx) || !isfinite(ry)) return;
   if (rx < 0.5f) return;
   if (ry < 0.5f) {
     g.drawFastHLine((int)lroundf(cx - rx), (int)lroundf(cy), (int)lroundf(2 * rx) + 1, c);
     return;
   }
-  int y0 = (int)ceilf(cy - ry), y1 = (int)floorf(cy + ry);
+  float fy0 = fmaxf(ceilf(cy - ry), 0.0f), fy1 = fminf(floorf(cy + ry), (float)(COIN_CV - 1));
+  if (fy1 < fy0) return;                         // off the canvas
+  int y0 = (int)fy0, y1 = (int)fy1;              // rows clamped to the canvas: always ends
   for (int y = y0; y <= y1; y++) {
     float k = (y - cy) / ry;
     float hw = rx * sqrtf(fmaxf(0.0f, 1.0f - k * k));
@@ -110,6 +115,8 @@ static void coinDrawStar(Adafruit_GFX& g) {
 
 // One frame: angle theta (0 = startFace up, each half-turn flips the side)
 static void coinDrawFrame(Adafruit_GFX& g, float theta, float scale, uint8_t startFace) {
+  if (!isfinite(theta)) theta = 0.0f;            // never draw from a bad number
+  if (!isfinite(scale) || scale < 0.5f || scale > 1.6f) scale = 1.0f;
   g.fillScreen(C_BLACK);
   float c = cosf(theta), s = sinf(theta);
   float sy = fabsf(c);
@@ -212,7 +219,10 @@ static int coinToss(GFXcanvas16* cv, uint8_t face) {
     while (true) {
       uint32_t t = millis() - t0;
       if (t >= COIN_SETTLE_MS) break;
-      theta = th1 + amp * expf(-t / 130.0f) * sinf(2.0f * PI * t / 170.0f);
+      // (float) BEFORE the minus: t is unsigned, so -t would be ~4 billion,
+      // expf() = infinity, and the angle would become NaN (this froze v10-v13).
+      float tf = (float)t;
+      theta = th1 + amp * expf(-tf / 130.0f) * sinf(2.0f * PI * tf / 170.0f);
       coinDrawFrame(*cv, theta, 1.0f, face);
       coinPush(cv);
       if (coinInput()) { again = true; break; }

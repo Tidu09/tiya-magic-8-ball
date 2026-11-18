@@ -35,6 +35,15 @@ Input rules for every game (Coin flip broke in v11-v12 by ignoring these):
   never reaches the 6 hits needed to quit. A gesture detector must never touch
   the shake counter.
 
+Number rule (Coin flip froze in v10-v13 because of this):
+- `millis()` times are unsigned. Cast to float BEFORE negating or subtracting
+  the other way: `expf(-(float)t / k)`, never `expf(-t / k)`. `-t` on a
+  `uint32_t` is ~4 billion, `expf` gives infinity, the maths turns into NaN,
+  and on the ESP32-C3 a NaN converted to `int` becomes INT_MAX, so a drawing
+  loop runs ~4 billion times: a frozen screen that ignores shakes and timeouts.
+- Drawing loops that take float coordinates must reject non-finite values
+  (`isfinite`) and clamp their range to the screen/canvas.
+
 ## Over-the-air updates
 
 The menu's **Update** row (just above Sleep) connects to Wi-Fi and installs a
