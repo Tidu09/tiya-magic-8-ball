@@ -15,6 +15,7 @@ The IDE shows the rest as tabs automatically.
 | `game_maze.ino` | marble maze |
 | `game_platform.ino` | platformer |
 | `game_roulette.ino` | European roulette (0-36) |
+| `game_coin.ino` | coin flip (heads = crown, tails = star) |
 | `beep_eyes.ino` | Beep's 17 eye styles + timer/ring/header drawing (pure Adafruit_GFX) |
 | `beep_run.ino` | Beep session: Pomodoro, phone check over MQTT, gestures |
 | `ota.ino` | over-the-air update from GitHub (Wi-Fi setup hotspot, download, restart) |
@@ -57,6 +58,9 @@ newer version from GitHub (`Tidu09/tiya-magic-8-ball`, folder `firmware/`).
   the number (spin again as often as you like). The bets RED, BLACK, ODD, EVEN,
   1-18, 19-36: a win spins again; score = wins in a row. 0 loses every bet.
   Hold sideways to spin. Finish feel: `ROU_FRET_HILL` / `ROU_POCK_DAMP`.
+- **Coin flip** (3rd in the menu): flick to change mode. JUST FLIP tosses and keeps a
+  heads/tails tally. CALL HEADS / CALL TAILS: a right call flips again; score = right
+  calls in a row. Hold sideways to flip.
   The menu now shows 4 rows at a time and scrolls (arrows show there is more).
 
 ## Axis constants (settled — do not re-guess)
@@ -82,7 +86,7 @@ screen away moves them DOWN.
 | `MAZE_ACCEL` / `MAZE_FRICTION` | how heavy or slippery the marble feels |
 | `MAX_PLAY_MS` / `IDLE_ABORT_MS` | battery guards on a running game |
 
-High scores are one NVS key per game (`bestRun`, `bestSnake`, `bestMaze`, `bestPlat`, `bestRoul`) in the
+High scores are one NVS key per game (`bestRun`, `bestSnake`, `bestMaze`, `bestPlat`, `bestRoul`, `bestCoin`) in the
 `m8b` namespace, written only when a score improves.
 
 ## Beep (study buddy)
@@ -101,10 +105,10 @@ in `docs/` (GitHub Pages: https://tidu09.github.io/tiya-magic-8-ball/).
   strike 3+ = shaking crash-out (no text: the eyes say it). Angry for 10 min -> session ends (battery).
 - Gestures: up-down wiggle = cute eyes, side-side wiggle = trippy eyes, hard
   shake = dizzy (again while dizzy = quit), laid flat = squint.
-- Screen: big seven-segment clock in the middle during focus/break, round dots
+- Screen: big seven-segment clock in the middle during focus/break, nothing
   underneath; eyes take over for reactions, wiggles and a random peek (45-90 s,
   20-40 s on breaks). No words on the face at all: no ring, no header, no
-  status text; waking up = happy eyes, done = eyes + filled round dots.
+  status text; waking up = happy eyes, done = eyes.
 - Power: Wi-Fi max modem sleep, 8.5 dBm, static eyes redraw only on change,
   animated ones at ~12 fps, radio off at the end.
 - Previews: the eye code is pure Adafruit_GFX, so it can be compiled on a PC

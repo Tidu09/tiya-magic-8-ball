@@ -1,8 +1,8 @@
 # Tiya's Magic 8-Ball
 
 ESP32-C3 SuperMini + LIS3DH + GC9A01 round TFT keychain: shake for an answer,
-hold it edge-on for games (tilt runner, roulette, snake, marble maze,
-platformer), and update it over Wi-Fi from this repo.
+hold it edge-on for games (tilt runner, roulette, coin flip, snake,
+marble maze, platformer), and update it over Wi-Fi from this repo.
 
 - `Magic8Ball/`: the Arduino sketch (open `Magic8Ball/Magic8Ball.ino`).
   See `Magic8Ball/README.md` for tabs, controls and tuning.

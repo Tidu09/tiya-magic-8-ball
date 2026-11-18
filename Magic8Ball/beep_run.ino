@@ -5,7 +5,7 @@
 //         during "Hi Tiya!" (left edge down = games, as before).
 //         Also the first row of the game menu.
 //
-//  No words on the face, ever: only eyes, drawings, the clock and round dots.
+//  No words on the face, ever: only eyes, drawings and the clock.
 //  1. HELLO  happy eyes; joins the saved Wi-Fi (the one set up for Update)
 //            and the phone page's message relay, reads her settings.
 //  3. FOCUS  big clock in the middle (eyes peek out now and then, and for
@@ -42,7 +42,6 @@ static const char* const BP_MOOD[BEEP_NUM_STYLES] = {
 };
 
 static GFXcanvas16* bp_cv = NULL;          // eyes
-static GFXcanvas16* bp_tv = NULL;          // timer / short text
 static BeepCfg bp_cfg;
 
 // ---------------- phone link (MQTT) ----------------
@@ -323,21 +322,15 @@ static void bp_pushEyes() {
   tft.drawRGBBitmap(BEEP_CV_X, BEEP_CV_Y, bp_cv->getBuffer(), BEEP_CV_W, BEEP_CV_H);
 }
 
-static void bp_pushTimer() {
-  tft.drawRGBBitmap(BEEP_TM_X, BEEP_TM_Y, bp_tv->getBuffer(), BEEP_TM_W, BEEP_TM_H);
-}
-
 // =====================================================================
 //  The session
 // =====================================================================
 int runBeep() {
   if (DEBUG_USB) Serial.println("Beep start");
   bp_cv = new GFXcanvas16(BEEP_CV_W, BEEP_CV_H);
-  bp_tv = new GFXcanvas16(BEEP_TM_W, BEEP_TM_H);
-  if (!bp_cv || !bp_cv->getBuffer() || !bp_tv || !bp_tv->getBuffer()) {
+  if (!bp_cv || !bp_cv->getBuffer()) {
     if (bp_cv) delete bp_cv;
-    if (bp_tv) delete bp_tv;
-    bp_cv = bp_tv = NULL;
+    bp_cv = NULL;
     tft.fillScreen(C_BLACK);
     drawMultiline("Beep needs\nmore memory", 120, 170, C_DANGER);
     delay(2000);
@@ -397,8 +390,6 @@ int runBeep() {
   // ---- what is on screen ----
   uint32_t lastRender = 0;
   uint32_t lastKey = 0xFFFFFFFF;
-  char shownTimer[24] = "";
-  uint16_t shownTimerCol = 1;
   int shownMode = -1;                     // centre: 0 eyes, 1 clock, 2 note
   long shownSecs = -1;
   uint16_t shownClockCol = 1;
@@ -656,29 +647,13 @@ int runBeep() {
     }
     shownMode = mode;
 
-    // Under the centre: round dots only (no words anywhere on the face).
-    // While waking up: nothing. When done: every finished round filled in.
-    char tm[24];
-    uint16_t tcol = timerPhase ? phaseCol : f.color;
-    if (timerPhase)           snprintf(tm, sizeof(tm), "%d/%d/%d", done, round, bp_cfg.rounds);
-    else if (phase == BP_DONE) snprintf(tm, sizeof(tm), "%d/0/%d", done, bp_cfg.rounds);
-    else                       strcpy(tm, "-");
-    if (strcmp(tm, shownTimer) || tcol != shownTimerCol) {
-      if (phase == BP_HELLO) bp_tv->fillScreen(0);
-      else beepDrawRounds(*bp_tv, done, timerPhase ? round : 0, bp_cfg.rounds, tcol);
-      bp_pushTimer();
-      strcpy(shownTimer, tm);
-      shownTimerCol = tcol;
-    }
-
     uint32_t spent = millis() - now;
     delay(spent < BEEP_LOOP_MS ? BEEP_LOOP_MS - spent : 1);
   }
 
   bp_netOff();
   delete bp_cv;
-  delete bp_tv;
-  bp_cv = bp_tv = NULL;
+  bp_cv = NULL;
   if (DEBUG_USB) Serial.printf("Beep end: %d rounds, %d strikes\n", done, strikes);
   return done;
 }

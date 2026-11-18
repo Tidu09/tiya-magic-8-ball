@@ -285,11 +285,6 @@ void beepDrawFace(Adafruit_GFX& g, const BeepFace& f) {
 }
 
 // ---------------- screen furniture (also used by the previews) ----------------
-#define BEEP_TM_W   120             // small canvas under the centre: screen x 60..179, y 186..215
-#define BEEP_TM_H   30
-#define BEEP_TM_X   60
-#define BEEP_TM_Y   186
-
 static void be_text(Adafruit_GFX& g, const char* s, int cx, int cy, const GFXfont* f, uint16_t c) {
   g.setFont(f);
   g.setTextSize(1);
@@ -354,18 +349,5 @@ void beepDrawClock(Adafruit_GFX& g, long secs, uint16_t c) {
     }
     be_digit(g, x, y, digits[i], c, ghost);
     x += BE_SEG_W + (i < n - 1 && i != n - 3 ? BE_SEG_GAP : 0);
-  }
-}
-
-// Small canvas: one dot per round (done = filled, current = ring, later = dim)
-void beepDrawRounds(Adafruit_GFX& g, int done, int current, int of, uint16_t c) {
-  g.fillScreen(BE_BG);
-  const int sp = 15;
-  int x0 = BEEP_TM_W / 2 - (of - 1) * sp / 2;
-  for (int i = 0; i < of; i++) {
-    int x = x0 + i * sp, y = BEEP_TM_H / 2;
-    if (i < done)             g.fillCircle(x, y, 4, c);
-    else if (i == current - 1) { g.drawCircle(x, y, 4, c); g.drawCircle(x, y, 3, c); }
-    else                      g.drawCircle(x, y, 3, be_blend(BE_BG, c, 0.35f));
   }
 }

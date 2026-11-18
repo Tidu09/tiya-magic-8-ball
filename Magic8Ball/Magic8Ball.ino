@@ -65,7 +65,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     9
+#define FW_VERSION     10
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network
@@ -294,7 +294,6 @@ const uint16_t BEEP_COLORS[] = {0xB21F, 0x07FF, 0xFA31, 0x3FF2, 0xFD20, 0xFFFF};
 const int BEEP_NUM_COLORS = sizeof(BEEP_COLORS) / sizeof(BEEP_COLORS[0]);
 void beepDrawFace(Adafruit_GFX& g, const BeepFace& f);
 void beepDrawClock(Adafruit_GFX& g, long secs, uint16_t c);
-void beepDrawRounds(Adafruit_GFX& g, int done, int current, int of, uint16_t c);
 // BEEP-SHARED-END
 
 struct BeepCfg {
@@ -338,6 +337,7 @@ const int NUM_ANSWERS = sizeof(ANSWERS) / sizeof(ANSWERS[0]);
 const GameEntry GAMES[] = {
   {"Beep",        "bestBeep"},   // study buddy, not a game: "best" = most focus rounds in one go
   {"Roulette",    "bestRoul"},
+  {"Coin flip",   "bestCoin"},
   {"Tilt runner", "bestRun"},
   {"Snake",       "bestSnake"},
   {"Marble maze", "bestMaze"},
@@ -418,6 +418,7 @@ int playSnake();
 int playMaze();
 int playPlatform();
 int playRoulette();
+int playCoin();
 // ota
 void runUpdate();
 // beep
@@ -454,10 +455,11 @@ void runGameFlow() {
       int score = 0;
       switch (sel) {
         case 1: score = playRoulette(); break;
-        case 2: score = playRunner();   break;
-        case 3: score = playSnake();    break;
-        case 4: score = playMaze();     break;
-        case 5: score = playPlatform(); break;
+        case 2: score = playCoin();     break;
+        case 3: score = playRunner();   break;
+        case 4: score = playSnake();    break;
+        case 5: score = playMaze();     break;
+        case 6: score = playPlatform(); break;
       }
 
       bool newBest = score > best;
