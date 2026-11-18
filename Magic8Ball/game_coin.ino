@@ -1,13 +1,9 @@
 // =====================================================================
 //  game_coin.ino — coin flip (3rd in the menu)
 //
-//  Flick UP       : change mode: JUST FLIP, CALL HEADS, CALL TAILS
-//  Hold SIDEWAYS  : toss the coin
-//  Shake          : quit to the menu
-//
-//  JUST FLIP never ends: toss, see the side, toss again (it keeps a
-//  heads / tails tally). With a call, a right call tosses again and the
-//  score is your streak; the first wrong call ends the game.
+//  Flick UP  : toss the coin (again and again, as often as you like)
+//  Shake     : back to the menu
+//  No modes, no score, no text. 60 s with no flick = back to the menu.
 //
 //  Heads = a crown, tails = a star. The coin is drawn into a small
 //  off-screen canvas and pushed in one go, so the toss never flickers.
@@ -28,11 +24,7 @@
 #define COIN_THICK      7.0f     // edge thickness seen side-on
 #define COIN_FLIP_MS    1500     // toss time (+ up to 400 ms random)
 #define COIN_SETTLE_MS  480      // wobble after landing
-#define COIN_RESULT_MS  1800
-#define COIN_HELP_MS    2200
-#define COIN_RING_R     80       // hold-to-toss progress dots
-#define COIN_RING_DOTS  24
-#define COIN_NUM_MODES  3
+#define COIN_IDLE_MS    60000UL  // no flick for this long = back to the menu
 
 #define COIN_C_RIM      0x9362   // dark gold
 #define COIN_C_FACE     0xF5E6   // gold
@@ -40,8 +32,6 @@
 #define COIN_C_EMBOSS   0xABC2   // raised design
 #define COIN_C_EDGE     0x7AA1   // the coin's edge
 #define COIN_C_GEM      0xE145   // red jewel on the crown
-
-static const char* const COIN_MODE_NAME[COIN_NUM_MODES] = {"JUST FLIP", "CALL HEADS", "CALL TAILS"};
 
 // Current face transform: design units -> canvas pixels (y squashed by coinSy)
 static float coinCx, coinCy, coinU, coinSy;
@@ -153,66 +143,6 @@ static void coinPush(GFXcanvas16* cv) {
   tft.drawRGBBitmap(COIN_CX - COIN_CV / 2, COIN_CY - COIN_CV / 2, cv->getBuffer(), COIN_CV, COIN_CV);
 }
 
-// ---------------------------------------------------------------- text
-static void coinTiny(const char* s, int cy, uint16_t col) {
-  tft.setFont(NULL);
-  tft.setTextSize(1);
-  tft.setTextColor(col);
-  int w = (int)strlen(s) * 6 - 1;
-  tft.setCursor(120 - w / 2, cy - 4);
-  tft.print(s);
-}
-
-static void coinTop(const char* s, uint16_t col) {
-  tft.fillRect(40, 10, 160, 25, C_BLACK);
-  drawCentered(s, 24, &FreeSansBold9pt7b, 1, col);
-}
-
-static void coinBottomClear() {
-  tft.fillRect(50, 201, 140, 26, C_BLACK);
-}
-
-static void coinDrawMode(int mode, int streak, int nH, int nT) {
-  coinTop(COIN_MODE_NAME[mode], mode == 0 ? COIN_C_FACE : C_WHITE);
-  coinBottomClear();
-  char b[24];
-  if (mode == 0) snprintf(b, sizeof(b), "heads %d  tails %d", nH, nT);
-  else           snprintf(b, sizeof(b), "wins %d", streak);
-  coinTiny(b, 212, (mode != 0 && streak > 0) ? C_YELLOW : C_RINGDIM);
-}
-
-static void coinHoldRing(int dots, int &last) {
-  if (dots == last) return;
-  int from = last;
-  if (dots < last) {
-    for (int i = 0; i < COIN_RING_DOTS; i++) {
-      float a = i * 2.0f * PI / COIN_RING_DOTS;
-      tft.fillCircle(COIN_CX + (int)lroundf(COIN_RING_R * sinf(a)),
-                     COIN_CY - (int)lroundf(COIN_RING_R * cosf(a)), 2, C_BLACK);
-    }
-    from = 0;
-  }
-  for (int i = from; i < dots; i++) {
-    float a = i * 2.0f * PI / COIN_RING_DOTS;
-    tft.fillCircle(COIN_CX + (int)lroundf(COIN_RING_R * sinf(a)),
-                   COIN_CY - (int)lroundf(COIN_RING_R * cosf(a)), 2, C_YELLOW);
-  }
-  last = dots;
-}
-
-static void coinHelp() {
-  tft.fillScreen(C_BLACK);
-  drawMultiline("Coin flip", 72, 170, C_YELLOW);
-  drawCentered("flick = call it", 120, &FreeSans9pt7b, 1, C_WHITE);
-  drawCentered("hold sideways = flip", 146, &FreeSans9pt7b, 1, C_WHITE);
-  drawCentered("right call = flip again", 180, &FreeSans9pt7b, 1, C_DIMTEXT);
-  uint32_t t0 = millis();
-  while (millis() - t0 < COIN_HELP_MS) {
-    if (shakePoll()) return;
-    delay(20);
-  }
-}
-
 // ---------------------------------------------------------------- the toss
 // Returns the side it lands on (0 heads, 1 tails), or -1 on a shake.
 static int coinToss(GFXcanvas16* cv, uint8_t startFace) {
@@ -254,99 +184,37 @@ static int coinToss(GFXcanvas16* cv, uint8_t startFace) {
 }
 
 // =====================================================================
-int playCoin() {
+// Flick = toss. Again and again until a shake (back to the menu).
+// No modes, no score, no text: crown up = heads, star up = tails.
+void playCoin() {
   if (DEBUG_USB) Serial.println("Coin flip start");
-
-  static bool helpShown = false;               // once per wake
-  static int mode = 0;                         // remembered between games
-  static uint8_t face = 0;                     // side showing now
-  static int nH = 0, nT = 0;                   // JUST FLIP tally (this wake)
-  if (!helpShown) {
-    helpShown = true;
-    shakeReset();
-    coinHelp();
-    if (shakeSeen()) return 0;
-  }
+  static uint8_t face = 0;                     // side showing now (kept between visits)
 
   tft.fillScreen(C_BLACK);
   GFXcanvas16* cv = new GFXcanvas16(COIN_CV, COIN_CV);
   if (cv && !cv->getBuffer()) { delete cv; cv = NULL; }
-  if (cv) { coinDrawFrame(*cv, 0.0f, 1.0f, face); coinPush(cv); }
+  if (!cv) {
+    drawMultiline("No memory\nfor the coin", 120, 170, C_DANGER);
+    delay(2000);
+    return;
+  }
+  coinDrawFrame(*cv, 0.0f, 1.0f, face);
+  coinPush(cv);
 
-  int streak = 0;
   shakeReset();
-
+  uint32_t lastAct = millis();
   while (true) {
-    // ---------------- choose mode ----------------
-    coinDrawMode(mode, streak, nH, nT);
-    int lastDots = 0;
-    bool holding = false, needLevel = true, toss = false, quit = false;
-    uint32_t holdStart = 0, lastAct = millis();
-
-    while (!toss) {
-      float up, right;
-      tiltBoth(up, right);                     // also feeds shake-to-quit
-      if (shakeSeen()) { quit = true; break; }
-
-      if (menuFlick()) {                       // flick = next mode (wraps)
-        mode = (mode + 1) % COIN_NUM_MODES;
-        if (mode == 0) streak = 0;
-        coinHoldRing(0, lastDots);
-        coinDrawMode(mode, streak, nH, nT);
-        holding = false;
-        lastAct = millis();
-      }
-
-      // you arrive here still tilted from the menu: level out first
-      if (fabsf(right) < MENU_PICK_DEG * 0.5f) needLevel = false;
-      bool sideways = !needLevel && fabsf(right) > MENU_PICK_DEG;
-
-      if (sideways) {
-        if (!holding) { holding = true; holdStart = millis(); }
-        float frac = (millis() - holdStart) / (float)MENU_HOLD_MS;
-        if (frac >= 1.0f) toss = true;
-        else coinHoldRing((int)(frac * COIN_RING_DOTS), lastDots);
-        lastAct = millis();
-      } else if (holding) {
-        holding = false;
-        coinHoldRing(0, lastDots);
-      }
-
-      if (millis() - lastAct > IDLE_ABORT_MS) {
-        if (DEBUG_USB) Serial.println("Idle abort");
-        quit = true;
-        break;
-      }
-      delay(FRAME_MS);
-    }
-    if (quit) break;
-
-    // ---------------- toss ----------------
-    coinHoldRing(0, lastDots);
-    coinBottomClear();
-    int res = coinToss(cv, face);
-    if (res < 0) break;                        // shaken mid-toss
-    face = (uint8_t)res;
-    if (res == 0) nH++; else nT++;
-
-    bool win = (mode == 1 && res == 0) || (mode == 2 && res == 1);
-    coinBottomClear();
-    drawCentered(res == 0 ? "HEADS" : "TAILS", 213, &FreeSansBold12pt7b, 1, COIN_C_FACE);
-    if (mode != 0) coinTop(win ? "RIGHT!" : "WRONG", win ? C_YELLOW : C_DANGER);
-    if (DEBUG_USB) Serial.printf("Coin: %s%s\n", res == 0 ? "heads" : "tails",
-                                 mode == 0 ? "" : win ? " -> right call" : " -> wrong call");
-
-    uint32_t t1 = millis();
-    while (millis() - t1 < COIN_RESULT_MS) {
-      if (shakePoll()) break;
-      delay(20);
+    if (menuFlick()) {                         // a little flick up = toss
+      int res = coinToss(cv, face);
+      if (res < 0) break;                      // shaken mid-toss
+      face = (uint8_t)res;
+      if (DEBUG_USB) Serial.printf("Coin: %s\n", res == 0 ? "heads" : "tails");
+      shakeReset();
+      lastAct = millis();
     }
     if (shakeSeen()) break;
-    if (mode == 0) continue;                   // JUST FLIP: toss again
-    if (!win) break;
-    streak++;
+    if (millis() - lastAct > COIN_IDLE_MS) break;   // battery guard: back to the menu
+    delay(FRAME_MS);
   }
-
-  if (cv) delete cv;
-  return streak;
+  delete cv;
 }

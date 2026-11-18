@@ -58,9 +58,8 @@ newer version from GitHub (`Tidu09/tiya-magic-8-ball`, folder `firmware/`).
   the number (spin again as often as you like). The bets RED, BLACK, ODD, EVEN,
   1-18, 19-36: a win spins again; score = wins in a row. 0 loses every bet.
   Hold sideways to spin. Finish feel: `ROU_FRET_HILL` / `ROU_POCK_DAMP`.
-- **Coin flip** (3rd in the menu): flick to change mode. JUST FLIP tosses and keeps a
-  heads/tails tally. CALL HEADS / CALL TAILS: a right call flips again; score = right
-  calls in a row. Hold sideways to flip.
+- **Coin flip** (3rd in the menu): flick up a little = toss, as often as you like.
+  No score, no text (crown = heads, star = tails). Shake = back to the menu.
   The menu now shows 4 rows at a time and scrolls (arrows show there is more).
 
 ## Axis constants (settled — do not re-guess)
@@ -86,7 +85,7 @@ screen away moves them DOWN.
 | `MAZE_ACCEL` / `MAZE_FRICTION` | how heavy or slippery the marble feels |
 | `MAX_PLAY_MS` / `IDLE_ABORT_MS` | battery guards on a running game |
 
-High scores are one NVS key per game (`bestRun`, `bestSnake`, `bestMaze`, `bestPlat`, `bestRoul`, `bestCoin`) in the
+High scores are one NVS key per game (`bestRun`, `bestSnake`, `bestMaze`, `bestPlat`, `bestRoul`) in the
 `m8b` namespace, written only when a score improves.
 
 ## Beep (study buddy)

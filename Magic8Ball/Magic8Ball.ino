@@ -65,7 +65,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     10
+#define FW_VERSION     11
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network
@@ -337,7 +337,7 @@ const int NUM_ANSWERS = sizeof(ANSWERS) / sizeof(ANSWERS[0]);
 const GameEntry GAMES[] = {
   {"Beep",        "bestBeep"},   // study buddy, not a game: "best" = most focus rounds in one go
   {"Roulette",    "bestRoul"},
-  {"Coin flip",   "bestCoin"},
+  {"Coin flip",   NULL},        // no score: just flick and toss
   {"Tilt runner", "bestRun"},
   {"Snake",       "bestSnake"},
   {"Marble maze", "bestMaze"},
@@ -418,7 +418,7 @@ int playSnake();
 int playMaze();
 int playPlatform();
 int playRoulette();
-int playCoin();
+void playCoin();
 // ota
 void runUpdate();
 // beep
@@ -447,6 +447,10 @@ void runGameFlow() {
       configureTiltMode();
       continue;
     }
+    if (sel == 2) {                         // "Coin flip": no score, no game-over screen
+      playCoin();
+      continue;
+    }
 
     // play the chosen game over and over until a shake sends us back
     while (true) {
@@ -455,7 +459,6 @@ void runGameFlow() {
       int score = 0;
       switch (sel) {
         case 1: score = playRoulette(); break;
-        case 2: score = playCoin();     break;
         case 3: score = playRunner();   break;
         case 4: score = playSnake();    break;
         case 5: score = playMaze();     break;

@@ -46,6 +46,8 @@ static void drawMenuList(int sel) {
       tft.setTextColor(on ? C_GAME : C_RINGDIM);
       tft.setCursor(120 - (int)(strlen(b) * 6 - 1) / 2, y + 5);
       tft.print(b);
+    } else if (!GAMES[i].key) {              // no score (coin flip): name only
+      drawCentered(GAMES[i].name, y + 1, &FreeSans9pt7b, 1, on ? C_WHITE : C_DIMTEXT);
     } else {
       drawCentered(GAMES[i].name, y - 3, &FreeSans9pt7b, 1, on ? C_WHITE : C_DIMTEXT);
       char b[20];
