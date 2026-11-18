@@ -65,7 +65,7 @@
 // ---------------- Firmware version + over-the-air update ----------------
 // Bump FW_VERSION and push to GitHub to ship an update: the repo's Actions
 // workflow compiles it and publishes firmware/ only when this number goes up.
-#define FW_VERSION     11
+#define FW_VERSION     12
 #define OTA_BASE_URL   "https://raw.githubusercontent.com/Tidu09/tiya-magic-8-ball/main/firmware/"
 // Backup server (jsDelivr CDN mirror of the same repo), tried if GitHub's
 // file server is blocked or unreachable on the local network

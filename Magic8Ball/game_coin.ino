@@ -1,7 +1,7 @@
 // =====================================================================
 //  game_coin.ino — coin flip (3rd in the menu)
 //
-//  Flick UP  : toss the coin (again and again, as often as you like)
+//  Flick UP  : toss the coin, any time, even while it is still spinning
 //  Shake     : back to the menu
 //  No modes, no score, no text. 60 s with no flick = back to the menu.
 //
@@ -144,43 +144,54 @@ static void coinPush(GFXcanvas16* cv) {
 }
 
 // ---------------------------------------------------------------- the toss
+// Tosses from `face` lying flat. A flick at ANY moment (mid-air or while it
+// wobbles) tosses it again from wherever it is, so it never feels stuck.
 // Returns the side it lands on (0 heads, 1 tails), or -1 on a shake.
-static int coinToss(GFXcanvas16* cv, uint8_t startFace) {
-  uint8_t res = esp_random() & 1;
-  int halves = 8 + (int)(esp_random() % 4);
-  if (((startFace ^ (halves & 1)) & 1) != res) halves++;
-  float endTheta = halves * PI;
+// The result is picked first and the number of half-turns is chosen so the
+// coin lands on it: exactly 50 / 50.
+static int coinToss(GFXcanvas16* cv, uint8_t face) {
+  float theta = 0.0f, scale = 1.0f;
+  while (true) {                                   // one pass per flick
+    uint8_t res = esp_random() & 1;
+    int n = (int)floorf(theta / PI) + 8 + (int)(esp_random() % 4);
+    if (((face ^ (n & 1)) & 1) != res) n++;
+    float th0 = theta, th1 = n * PI, s0 = scale;
+    bool again = false;
 
-  if (!cv) {                                     // no RAM for the canvas: no animation
-    delay(600);
+    uint32_t dur = COIN_FLIP_MS + esp_random() % 400;
+    uint32_t t0 = millis();
+    while (true) {
+      float u = (millis() - t0) / (float)dur;
+      if (u >= 1.0f) break;
+      float e = 1.0f - powf(1.0f - u, 1.6f);       // spins fast, slows as it lands
+      theta = th0 + (th1 - th0) * e;
+      scale = 1.0f + COIN_LIFT * sinf(PI * u) + (s0 - 1.0f) * (1.0f - u);
+      coinDrawFrame(*cv, theta, scale, face);
+      coinPush(cv);
+      if (menuFlick()) { again = true; break; }    // flicked mid-air: toss again
+      if (shakeSeen()) return -1;
+    }
+    if (again) continue;
+
+    // land and wobble to rest
+    scale = 1.0f;
+    float amp = 0.30f + (esp_random() % 100) / 1000.0f;
+    t0 = millis();
+    while (true) {
+      uint32_t t = millis() - t0;
+      if (t >= COIN_SETTLE_MS) break;
+      theta = th1 + amp * expf(-t / 130.0f) * sinf(2.0f * PI * t / 170.0f);
+      coinDrawFrame(*cv, theta, 1.0f, face);
+      coinPush(cv);
+      if (menuFlick()) { again = true; break; }
+      if (shakeSeen()) return -1;
+    }
+    if (again) continue;
+
+    coinDrawFrame(*cv, th1, 1.0f, face);           // flat: same picture as res at angle 0
+    coinPush(cv);
     return res;
   }
-
-  uint32_t dur = COIN_FLIP_MS + esp_random() % 400;
-  uint32_t t0 = millis();
-  while (true) {
-    float u = (millis() - t0) / (float)dur;
-    if (u >= 1.0f) break;
-    float e = 1.0f - powf(1.0f - u, 1.6f);      // spins fast, slows as it lands
-    coinDrawFrame(*cv, endTheta * e, 1.0f + COIN_LIFT * sinf(PI * u), startFace);
-    coinPush(cv);
-    if (shakePoll()) return -1;
-  }
-
-  // land and wobble to rest
-  float amp = 0.30f + (esp_random() % 100) / 1000.0f;
-  t0 = millis();
-  while (true) {
-    uint32_t t = millis() - t0;
-    if (t >= COIN_SETTLE_MS) break;
-    float wob = amp * expf(-t / 130.0f) * sinf(2.0f * PI * t / 170.0f);
-    coinDrawFrame(*cv, endTheta + wob, 1.0f, startFace);
-    coinPush(cv);
-    if (shakePoll()) return -1;
-  }
-  coinDrawFrame(*cv, endTheta, 1.0f, startFace);
-  coinPush(cv);
-  return res;
 }
 
 // =====================================================================
